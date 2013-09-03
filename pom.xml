@@ -8,11 +8,10 @@
 		<version>3.2</version>
 	</parent>
 
-	<artifactId>diffcrawler-plugin</artifactId>
+	<artifactId>testsuiteextension-plugin</artifactId>
 
-	<name>DiffCrawler Plugin</name>
-	<description>DiffCrawler is an incremental Ajax crawler built on Crawljax tool which dynamically builds a `state-flow graph' modeling
-the various navigation paths and states within an Ajax application. DiffCrawler applies code change analysis to find modified parts of the javascript code and crawl towrads the modified states given the SFG from the previous run.</description>
+	<name>TestSuiteExtension Plugin</name>
+	<description>TestSuiteExtension is Crawljax plugin tool which extends a current Selenium test suite of an Ajax application. TestSuiteExtension initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.</description>
 	<inceptionYear>2013</inceptionYear>
 
 	<developers>
