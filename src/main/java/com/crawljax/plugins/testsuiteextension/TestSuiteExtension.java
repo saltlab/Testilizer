@@ -1,4 +1,4 @@
-package com.crawljax.plugins.diffcrawler;
+package com.crawljax.plugins.testsuiteextension;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -36,14 +36,10 @@ import com.crawljax.core.plugin.PreStateCrawlingPlugin;
 import com.crawljax.core.state.Eventable;
 import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateVertex;
-import com.crawljax.plugins.jsmodify.AstInstrumenter;
-import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
+//import com.crawljax.plugins.jsmodify.AstInstrumenter;
+//import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.plugins.utils.EventFunctionRelation;
 import com.crawljax.plugins.utils.JSFunctionInfo;
-import com.crawljax.plugins.diffcrawler.model.CandidateElementPosition;
-import com.crawljax.plugins.diffcrawler.model.OutPutModel;
-import com.crawljax.plugins.diffcrawler.model.Serializer;
-import com.crawljax.plugins.diffcrawler.model.State;
 import com.fasterxml.jackson.databind.deser.Deserializers;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -56,17 +52,14 @@ import com.google.common.collect.Maps;
  * The DiffCrawler plug-in is built on top of the crawloverview plug-in that generates a HTML report from the crawling session
  * including screenshots of the visited states, the clicked elements, and the state-flow graph.
  **/
-public class DiffCrawler implements OnNewStatePlugin, PreStateCrawlingPlugin,
+public class TestSuiteExtension implements OnNewStatePlugin, PreStateCrawlingPlugin,
 PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, PreCrawlingPlugin{
 
 	private static final Logger LOG = LoggerFactory
-			.getLogger(DiffCrawler.class);
+			.getLogger(TestSuiteExtension.class);
 
-	private final OutputBuilder outputBuilder;
 	private final ConcurrentMap<String, StateVertex> visitedStates;
-	private final OutPutModelCache outModelCache;
 	private boolean warnedForElementsInIframe = false;
-	private OutPutModel result;
 
 	
 	// The event-function relation table EFT stores which functions were executed as a result of firing an event
@@ -77,13 +70,9 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	private ArrayList<EventFunctionRelation> oldEFT = new ArrayList<EventFunctionRelation>();
 	private ArrayList<JSFunctionInfo> oldJSFunctions = new ArrayList<JSFunctionInfo>();
 
-	private JSCodeChangeAnalyzer analyzer = new JSCodeChangeAnalyzer();
-
-	public DiffCrawler(File outputFolder) {
+	public TestSuiteExtension(File outputFolder) {
 		Preconditions
 		.checkNotNull(outputFolder, "Output folder cannot be null");
-		outputBuilder = new OutputBuilder(outputFolder);
-		outModelCache = new OutPutModelCache();
 		visitedStates = Maps.newConcurrentMap();
 		LOG.info("Initialized the DiffCrawler plugin");
 	}
@@ -94,31 +83,9 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 		LOG.debug("onNewState");
-		StateBuilder state = outModelCache.addStateIfAbsent(vertex);
-		visitedStates.putIfAbsent(state.getName(), vertex);
-		saveScreenshot(context.getBrowser(), state.getName(), vertex);
-		outputBuilder.persistDom(state.getName(), vertex.getDom());
 	}
 
-	private void saveScreenshot(EmbeddedBrowser browser, String name,
-			StateVertex vertex) {
-		LOG.debug("Saving screenshot for state {}", name);
-		File jpg = outputBuilder.newScreenShotFile(name);
-		File thumb = outputBuilder.newThumbNail(name);
-		try {
-			byte[] screenshot = browser.getScreenShot();
-			ImageWriter.writeScreenShotAndThumbnail(screenshot, jpg, thumb);
-		} catch (CrawljaxException | WebDriverException e) {
-			LOG.warn(
-					"Screenshots are not supported or not functioning for {}. Exception message: {}",
-					browser, e.getMessage());
-			LOG.debug("Screenshot not made because {}", e.getMessage(), e);
-		}
-		LOG.trace("Screenshot saved");
-	}
 
-	
-	
 	/**
 	 * Initializing the DiffCrawler with the old SFG and the old EFT
 	 */
@@ -194,23 +161,9 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	public void preStateCrawling(CrawlerContext context,
 			ImmutableList<CandidateElement> candidateElements, StateVertex state) {
 		LOG.debug("preStateCrawling");
-		List<CandidateElementPosition> newElements = Lists.newLinkedList();
 		LOG.info("Prestate found new state {} with {} candidates",
 				state.getName(), candidateElements.size());
-		for (CandidateElement element : candidateElements) {
-			try {
-				WebElement webElement = getWebElement(context.getBrowser(), element);
-				if (webElement != null) {
-					newElements.add(findElement(webElement, element));
-				}
-			} catch (WebDriverException e) {
-				LOG.info("Could not get position for {}", element, e);
-			}
-		}
 
-		StateBuilder stateOut = outModelCache.addStateIfAbsent(state);
-		stateOut.addCandidates(newElements);
-		LOG.trace("preState finished, elements added to state");
 	}
 
 	private WebElement getWebElement(EmbeddedBrowser browser,
@@ -235,20 +188,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		}
 	}
 
-	private CandidateElementPosition findElement(WebElement webElement,
-			CandidateElement element) {
-		Point location = webElement.getLocation();
-		Dimension size = webElement.getSize();
-		CandidateElementPosition renderedCandidateElement =
-				new CandidateElementPosition(element.getIdentification().getValue(),
-						location, size);
-		if (location.getY() < 0) {
-			LOG.warn("Weird positioning {} for {}", webElement.getLocation(),
-					renderedCandidateElement.getXpath());
-		}
-		return renderedCandidateElement;
-	}
-
 	/**
 	 * Generated the report.
 	 */
@@ -256,13 +195,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
 		LOG.debug("postCrawling");
 		StateFlowGraph sfg = session.getStateFlowGraph();
-		result = outModelCache.close(session, exitStatus);
-		outputBuilder.write(result, session.getConfig());
-		StateWriter writer = new StateWriter(outputBuilder, sfg,
-				ImmutableMap.copyOf(visitedStates));
-		for (State state : result.getStates().values()) {
-			writer.writeHtmlForState(state);
-		}
 		
 		// Writing event-function relation table, SFG, and jsFunctions to corresponding files
 		FileOutputStream fos = null;
@@ -330,7 +262,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		try {
 			fos = new FileOutputStream(jsFuncFileName);
 			out = new ObjectOutputStream(fos);
-			out.writeObject(AstInstrumenter.jsFunctions);
 			out.close();
 			LOG.info("DiffCrawler successfully wrote AstInstrumenter.jsFunctions to functions.ser file");
 		} catch (Exception ex) {
@@ -341,13 +272,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		LOG.info("DiffCrawler plugin has finished");
 	}
 
-	/**
-	 * @return the result of the Crawl or <code>null</code> if it hasn't finished yet.
-	 */
-	public OutPutModel getResult() {
-		return result;
-	}
-
 	@Override
 	public String toString() {
 		return "DiffCrawler plugin";
@@ -356,7 +280,7 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	@Override
 	public void onFireEventFailed(CrawlerContext context, Eventable eventable,
 			List<Eventable> pathToFailure) {
-		outModelCache.registerFailEvent(context.getCurrentState(), eventable);
+		return;
 	}
 
 	@Override
@@ -365,8 +289,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		// TODO: check for DOM statement changes and affected functions
 		// TODO: set Xpaths to states need to be recrawled
 		
-		ArrayList<JSFunctionInfo> affectedFunctions = analyzer.getAffectedFunctions(oldJSFunctions, AstInstrumenter.jsFunctions);
-		LOG.info("DOM accessing statements are changed in these functions:" + affectedFunctions);
 	}
 
 	/**
@@ -384,8 +306,8 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		ArrayList<String> executedJSFunctions = new ArrayList<String>();
 		executedJSFunctions.clear();
 
-		// get functions executed from instrumented code in the browser
-		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
+		// TODO: calculate code coverage
+		/*for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
 			try{
 				Object executedFunctions =  context.getBrowser().executeJavaScript("return " + modifiedJS + "_executed_functions;");
 				ArrayList tempList = (ArrayList) executedFunctions;
@@ -397,7 +319,7 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 			}catch (Exception e) {
 				LOG.info("Could not execute script: " + "return " + modifiedJS + "_executed_functions;");
 			}
-		}
+		}*/
 
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
 
