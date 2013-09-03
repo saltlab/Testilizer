@@ -3,6 +3,7 @@ package com.crawljax.plugins.testsuiteextension;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
@@ -12,20 +13,26 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.commons.lang3.SerializationUtils;
+import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.Point;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
 
 import com.crawljax.browser.EmbeddedBrowser;
 import com.crawljax.core.CandidateElement;
 import com.crawljax.core.CrawlSession;
+import com.crawljax.core.CrawlTaskConsumer;
 import com.crawljax.core.CrawlerContext;
 import com.crawljax.core.CrawljaxException;
 import com.crawljax.core.ExitNotifier.ExitStatus;
+import com.crawljax.core.configuration.CrawlElement;
 import com.crawljax.core.configuration.CrawljaxConfiguration;
+import com.crawljax.core.plugin.ExecuteInitialPathsPlugin;
 import com.crawljax.core.plugin.OnFireEventFailedPlugin;
 import com.crawljax.core.plugin.OnFireEventSucceededPlugin;
 import com.crawljax.core.plugin.OnNewStatePlugin;
@@ -34,12 +41,16 @@ import com.crawljax.core.plugin.PostCrawlingPlugin;
 import com.crawljax.core.plugin.PreCrawlingPlugin;
 import com.crawljax.core.plugin.PreStateCrawlingPlugin;
 import com.crawljax.core.state.Eventable;
+import com.crawljax.core.state.Identification;
 import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateVertex;
+import com.crawljax.core.state.Eventable.EventType;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.plugins.utils.EventFunctionRelation;
 import com.crawljax.plugins.utils.JSFunctionInfo;
+import com.crawljax.util.DomUtils;
+import com.crawljax.util.XPathHelper;
 import com.fasterxml.jackson.databind.deser.Deserializers;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -49,14 +60,13 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 /**
- * The DiffCrawler plug-in is built on top of the crawloverview plug-in that generates a HTML report from the crawling session
- * including screenshots of the visited states, the clicked elements, and the state-flow graph.
+ * TestSuiteExtension is Crawljax plugin tool which extends a current Selenium test suite of an Ajax application. 
+ * It initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.
  **/
-public class TestSuiteExtension implements OnNewStatePlugin, PreStateCrawlingPlugin,
-PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, PreCrawlingPlugin{
+public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
+PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin{
 
-	private static final Logger LOG = LoggerFactory
-			.getLogger(TestSuiteExtension.class);
+	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
 	private final ConcurrentMap<String, StateVertex> visitedStates;
 	private boolean warnedForElementsInIframe = false;
@@ -65,94 +75,198 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	// The event-function relation table EFT stores which functions were executed as a result of firing an event
 	private ArrayList<EventFunctionRelation> newEFT = new ArrayList<EventFunctionRelation>();
 
-	// old version info loaded from file
-	private StateFlowGraph oldSFG = null;
-	private ArrayList<EventFunctionRelation> oldEFT = new ArrayList<EventFunctionRelation>();
-	private ArrayList<JSFunctionInfo> oldJSFunctions = new ArrayList<JSFunctionInfo>();
+	//private StateFlowGraph oldSFG = null;
 
+	private EmbeddedBrowser browser = null;
+	CrawljaxConfiguration config = null;
+	
 	public TestSuiteExtension(File outputFolder) {
 		Preconditions
 		.checkNotNull(outputFolder, "Output folder cannot be null");
 		visitedStates = Maps.newConcurrentMap();
-		LOG.info("Initialized the DiffCrawler plugin");
+		LOG.info("Initialized the TestSuiteExtension plugin");
 	}
 
+	
 	/**
-	 * Saves a screenshot of every new state.
-	 */
-	@Override
-	public void onNewState(CrawlerContext context, StateVertex vertex) {
-		LOG.debug("onNewState");
-	}
-
-
-	/**
-	 * Initializing the DiffCrawler with the old SFG and the old EFT
+	 * Initializing the SFG with Selenium test cases
 	 */
 	@Override
 	public void preCrawling(CrawljaxConfiguration config) {
-		LOG.info("DiffCrawler plugin started");
+		LOG.info("TestSuiteExtension plugin started");
+
+		// TODO: Checking for the instrumented test suite file
+		LOG.info("Checking for the instrumented test suite file...");
 		
-		// TODO: get jsFunction info from the current version using the proxy. should probably override response for proxy as well...
+		// IF FOUND!
 		
-		try {
-
-			LOG.info("Reading the old EFT and the old SFG from file");
-
-			// Read the old EFT (event-function relation table) and the old SFG from file
-			FileInputStream fis = null;
-			ObjectInputStream in = null;
-
-			// Read the old SFG from file
-			String sfgFileName = "sfg.ser";
-			try {
-				fis = new FileInputStream(sfgFileName);
-				in = new ObjectInputStream(fis);
-				oldSFG = (StateFlowGraph) in.readObject();
-				in.close();
-			} catch (Exception ex) {
-				ex.printStackTrace();
-			}
-			//LOG.info(Serializer.toPrettyJson(oldSFG));
-			LOG.info("oldSFG: " + oldSFG);
-
-			// Read the old EFT from file
-			String eftFileName = "eft.ser";
-			try {
-				fis = new FileInputStream(eftFileName);
-				in = new ObjectInputStream(fis);
-				oldEFT = (ArrayList<EventFunctionRelation>) in.readObject();
-				in.close();
-			} catch (Exception ex) {
-				ex.printStackTrace();
-			}
-
-			//LOG.info(Serializer.toPrettyJson(oldEFT));
-			LOG.info("oldEFT: " + oldEFT);
-			
-			// Read the old jsFunctions from file
-			String jsFuncFileName = "functions.ser";
-			try {
-				fis = new FileInputStream(jsFuncFileName);
-				in = new ObjectInputStream(fis);
-				oldJSFunctions = (ArrayList<JSFunctionInfo>) in.readObject();
-				in.close();
-			} catch (Exception ex) {
-				ex.printStackTrace();
-			}
-			//LOG.info(Serializer.toPrettyJson(oldJSFunctions));
-			LOG.info("oldJSFunctions: " + oldJSFunctions);
-
-			
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		// TODO: Executing the instrumented test cases
+		LOG.info("Executing the instrumented test cases...");
+		
+		
+		// TODO: Creating a SFG with initial paths based on executed instrumented code
+		LOG.info("Creating a SFG with initial paths based on executed instrumented code...");
 
 		
 	}
 
+
+	
+	/**
+	 * Executes happy paths only once after the index state was created.
+	 */
+	@Override
+	public void initialPathExecution(CrawljaxConfiguration conf, CrawlTaskConsumer firstConsumer) {
+		WebElement webElement = null;
+		LOG.debug("Setting up initial crawl paths from test cases");
+
+		// Reseting the crawler before each test case
+		firstConsumer.getCrawler().reset();
+
+		browser = firstConsumer.getContext().getBrowser();
+		config = conf;
+		
+		// This comes from Selenium test cases
+		webElement = browser.getBrowser().findElement(By.id("login"));
+		webElement.clear();
+		webElement = browser.getBrowser().findElement(By.id("login"));
+		webElement.sendKeys("nainy");
+		webElement = browser.getBrowser().findElement(By.id("password"));
+		webElement.clear();
+		webElement = browser.getBrowser().findElement(By.id("password"));
+		webElement.sendKeys("nainy");
+		webElement = browser.getBrowser().findElement(By.cssSelector("button[type=\"submit\"]"));
+
+		// generate corresponding Eventable for webElement
+		Eventable event = getCorrespondingEventable(webElement, EventType.click, browser);
+
+		// This comes from Selenium test cases
+		webElement.click();
+
+		// inspecting DOM changes and adding to SFG
+		firstConsumer.getCrawler().inspectNewState(event);
+
+		// This comes from Selenium test cases
+		webElement = browser.getBrowser().findElement(By.linkText("Logout"));
+
+		// generate corresponding Eventable for webElement
+		event = getCorrespondingEventable(webElement, EventType.click, browser);
+
+		webElement.click();
+
+		firstConsumer.getCrawler().inspectNewState(event);
+
+	}
+	//Amin
+	private Eventable getCorrespondingEventable(WebElement webElement, EventType eventType, EmbeddedBrowser browser) {
+		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, browser);
+		Eventable event = new Eventable(candidateElement, eventType);
+		System.out.println(event);
+		return event;
+	}
+
+	//Amin
+	private CandidateElement getCorrespondingCandidateElement(WebElement webElement, EmbeddedBrowser browser) {
+		Document dom;
+		
+		try {
+			dom = DomUtils.asDocument(browser.getStrippedDomWithoutIframeContent());
+
+			for (CrawlElement crawlTag : config.getCrawlRules().getAllCrawlElements()) {
+				// checking all tags defined in the crawlRules
+				NodeList nodeList = dom.getElementsByTagName(crawlTag.getTagName());
+
+				String xpath1 = getXPath(webElement);
+				String xpath2 = null;
+				org.w3c.dom.Element sourceElement = null;
+
+				for (int k = 0; k < nodeList.getLength(); k++){
+					sourceElement = (org.w3c.dom.Element) nodeList.item(k);
+					// check if sourceElement is webElement
+					if (checkEqulity(webElement, sourceElement)){
+						xpath2 = XPathHelper.getXPathExpression(sourceElement);
+						// System.out.println("xpath : " + xpath2);
+						CandidateElement candidateElement = new CandidateElement(sourceElement, new Identification(Identification.How.xpath, xpath2), "");
+						LOG.debug("Found new candidate element: {} with eventableCondition {}",	candidateElement.getUniqueString(), null);
+						candidateElement.setEventableCondition(null);
+						return candidateElement;
+					}
+				}
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		System.out.println("could not find the corresponding CandidateElement");
+		return null;
+	}
+
+	//Amin
+	private boolean checkEqulity(WebElement webElement,	org.w3c.dom.Element sourceElement) {
+		
+		//get xpath of the WebElement
+		String xpath1 = getXPath(webElement);
+
+		System.out.println("WebElement: " + webElement);
+		System.out.println("has xpath : " + xpath1);
+
+		// check if xpaths are the same
+		String xpath2 = XPathHelper.getXPathExpression(sourceElement);
+		System.out.println("sourceElement: " + sourceElement);
+		System.out.println("has xpath : " + xpath2);
+
+		// removing "[1]" from xpath2 for consistency with the xpath1 format 
+		xpath2 = xpath2.replace("[1]","");  
+
+		if (xpath2.equals(xpath1)){
+			System.out.println("xpaths are equal");
+			return true;
+		}
+		
+		System.out.println("xpaths are not equal");
+		return false;
+	}
+
+	//Amin
+	public String getXPath(WebElement element) {
+
+		String jscript = "function getElementXPath(elt) " +   
+				"{" + 
+				"var path = \"\";" +
+				"for (; elt && elt.nodeType == 1; elt = elt.parentNode)" + 
+				"{" +        
+				"idx = getElementIdx(elt);" + 
+				"xname = elt.tagName;" +
+				"if (idx > 1) xname += \"[\" + idx + \"]\";" + 
+				"path = \"/\" + xname + path;" + 
+				"}" +  
+				"return path;" + 
+				"} " + 
+				"function getElementIdx(elt) "+ 
+				"{"  + 
+				"var count = 1;" + 
+				"for (var sib = elt.previousSibling; sib ; sib = sib.previousSibling) " + 
+				"{" + 
+				"if(sib.nodeType == 1 && sib.tagName == elt.tagName) count++; " + 
+				"} " +     
+				"return count;" + 
+				"} " +
+				"return getElementXPath(arguments[0]);";
+
+		String xpath = (String) browser.executeJavaScriptWithParam(jscript, element);
+		return xpath;
+	} 
 	
 	
+
+
+	
+	@Override
+	public void onNewState(CrawlerContext context, StateVertex vertex) {
+	}
+
+
+
 	/**
 	 * Logs all the candidate elements so that the plugin knows which elements were the candidate
 	 * elements.
@@ -166,8 +280,7 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 
 	}
 
-	private WebElement getWebElement(EmbeddedBrowser browser,
-			CandidateElement element) {
+	private WebElement getWebElement(EmbeddedBrowser browser, CandidateElement element) {
 		try {
 			if (!Strings.isNullOrEmpty(element.getRelatedFrame())) {
 				warnUserForInvisibleElements();
@@ -207,7 +320,7 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 			out = new ObjectOutputStream(fos);
 			out.writeObject(sfg);
 			out.close();
-			LOG.info("DiffCrawler successfully wrote SFG to sfg.ser file");
+			LOG.info("TestSuiteExtension successfully wrote SFG to sfg.ser file");
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
@@ -238,7 +351,7 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 			out = new ObjectOutputStream(fos);
 			out.writeObject(newEFT);
 			out.close();
-			LOG.info("DiffCrawler successfully wrote EFT to eft.ser file");
+			LOG.info("TestSuiteExtension successfully wrote EFT to eft.ser file");
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
@@ -257,24 +370,14 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		LOG.info("EFT2: " + EFT2);
 		*/
 
-		// Save the AstInstrumenter.jsFunctions to file
-		String jsFuncFileName = "functions.ser";
-		try {
-			fos = new FileOutputStream(jsFuncFileName);
-			out = new ObjectOutputStream(fos);
-			out.close();
-			LOG.info("DiffCrawler successfully wrote AstInstrumenter.jsFunctions to functions.ser file");
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
 			
 		
-		LOG.info("DiffCrawler plugin has finished");
+		LOG.info("TestSuiteExtension plugin has finished");
 	}
 
 	@Override
 	public String toString() {
-		return "DiffCrawler plugin";
+		return "TestSuiteExtension plugin";
 	}
 
 	@Override
@@ -285,14 +388,11 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 
 	@Override
 	public void onUrlLoad(CrawlerContext context) {
-		// TODO crawl given a crawlpath to specific states
-		// TODO: check for DOM statement changes and affected functions
-		// TODO: set Xpaths to states need to be recrawled
-		
+		// TODO Reset for crawling from states in the happy paths
 	}
 
 	/**
-	 * After a successful event firing, create an event-function relation and add it to the EFT table
+	 * After a successful event firing, calculate the code coverage
 	 * 
 	 * @param context
 	 * @param stateBefore
@@ -327,6 +427,7 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		EventFunctionRelation newRelation = new EventFunctionRelation(eventable, stateBefore, stateAfter, executedJSFunctions);
 		newEFT.add(newRelation);
 	}
+
 
 
 }
