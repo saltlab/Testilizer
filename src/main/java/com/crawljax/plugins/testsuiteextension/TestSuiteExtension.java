@@ -33,15 +33,12 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
-import salt.domcoverage.core.code2instrument.DomCoverageClass.Type;
-
 
 import com.crawljax.browser.EmbeddedBrowser;
 import com.crawljax.core.CandidateElement;
 import com.crawljax.core.CrawlSession;
 import com.crawljax.core.CrawlTaskConsumer;
 import com.crawljax.core.CrawlerContext;
-import com.crawljax.core.CrawljaxException;
 import com.crawljax.core.ExitNotifier.ExitStatus;
 import com.crawljax.core.configuration.CrawlElement;
 import com.crawljax.core.configuration.CrawljaxConfiguration;

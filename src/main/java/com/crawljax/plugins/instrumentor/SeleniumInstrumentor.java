@@ -7,11 +7,16 @@ import japa.parser.ast.expr.Expression;
 import japa.parser.ast.expr.MethodCallExpr;
 
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 
+import org.openqa.selenium.By;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,9 +24,24 @@ import com.crawljax.plugins.utils.CompilationUnitUtils;
 
 
 public class SeleniumInstrumentor {
-	
+
 	private static final Logger LOG = LoggerFactory.getLogger(SeleniumInstrumentor.class);
 
+	private static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
+	private FileOutputStream fos = null;
+	private static ObjectOutputStream out = null;
+
+	public SeleniumInstrumentor() {
+		try {
+			fos = new FileOutputStream(seleniumExecutionTrace);
+			out = new ObjectOutputStream(fos);
+		} catch (Exception ex) {
+			// TODO Auto-generated catch block
+			ex.printStackTrace();
+		}
+	}
+
+	
 	public void instrument(String fileName) {
 		LOG.info("Instrumenting the Selenium test cases in {}", fileName);
 		instrument(fileName, true);
@@ -61,22 +81,55 @@ public class SeleniumInstrumentor {
 	public MethodCallExpr instrumentMethodCall(MethodCallExpr mce) {
 		List<Expression> oldArgs = mce.getArgs();
 		// create a methodcall expre
-		String codeToInstrument = "com.crawljax.plugins.instrumentor.DomCoverageClass.collectData";
+		String codeToInstrument = null;
+		if (mce.getName().equals("findElement"))
+			codeToInstrument = "com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getBy";
+		else if (mce.getName().equals("sendKeys"))
+			codeToInstrument = "com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getInput";
+		
 		MethodCallExpr call = new MethodCallExpr(null, codeToInstrument);
-		MethodCallExpr calltoPageSource = new MethodCallExpr(null, mce.getScope().toString() + ".getPageSource");
-		MethodCallExpr calltoClassName = new MethodCallExpr(null, "this.getClass().getName()+\".\"+new Object(){}.getClass().getEnclosingMethod().getName");
-		oldArgs.add(calltoPageSource);
-		oldArgs.add(calltoClassName);
-
 		call.setArgs(oldArgs);
 		// put oldargs as it's argument
-
 		// setarguments of mce
 		List<Expression> newArgs = new ArrayList<Expression>();
 		newArgs.add(call);
 		mce.setArgs(newArgs);
-
 		return mce;
 	}
+
+	// should be static to be used by instrumented test cases
+	public static By getBy(By by) {
+		try {
+			out.writeObject(by);
+			LOG.info("Successfully wrote {} to {} file" , by, seleniumExecutionTrace);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return by;
+	}
+	
+	// should be static to be used by instrumented test cases
+	public static String getInput(String input) {
+		try {
+			out.writeObject(input);
+			LOG.info("Successfully wrote {} to {} file" , input, seleniumExecutionTrace);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return input;
+	}	
+	
+	
+	private void closeFile(){
+		try {
+			out.close();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}		
+	}
+	
+	
 
 }
