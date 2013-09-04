@@ -14,15 +14,16 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 import com.crawljax.plugins.utils.CompilationUnitUtils;
-import com.crawljax.plugins.utils.ConstantVars;
 import com.crawljax.plugins.utils.MethodCallVisitor;
 
 
 public class TestCaseParser {
 
+	public static final String[] seleniumDomRelatedMethodCallList = new String[] { "findElement" };
+
 	public HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> getSeleniumDomRelateMethodCallExpressions(CompilationUnit cu) throws FileNotFoundException, ParseException, IOException {
 		ArrayList<MethodDeclaration> testMethodsofCompilationUnit = CompilationUnitUtils.testMethodsofCompilationUnit(cu);
-		return getMethodCallExpressions(testMethodsofCompilationUnit, ConstantVars.seleniumDomRelatedMethodCallList);
+		return getMethodCallExpressions(testMethodsofCompilationUnit, seleniumDomRelatedMethodCallList);
 
 	}
 

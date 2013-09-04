@@ -33,6 +33,8 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
+import salt.domcoverage.core.code2instrument.DomCoverageClass.Type;
+
 
 import com.crawljax.browser.EmbeddedBrowser;
 import com.crawljax.core.CandidateElement;
@@ -78,16 +80,9 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
-	public static final String DISTANCES_ARRAY = "Distances.csv";
-	public static final String[] seleniumDomRelatedMethodCallList = new String[] { "findElement" };
-	public static final String[] ELEMENTS_NOT_COUNT = new String[] { "p", "form", "tbody", "tabular", "span", "thead", "h1", "h2", "h3", "br", "hr", "code", "i", "kbd", "pre", "small", "strong", "abbr", "ul", "ol", "dl", "th", "select" };
-	public static final String[] ELEMENTS_TO_COUNT = new String[] { "div", "input", "a", "li", "td", "tr", "table", "option", "img", "dt", "iframe", "textarea" };
-	public static final String INJECT_ELEMENT_ACCESS_JS = "elementaccessinject.js";
-
 	private final ConcurrentMap<String, StateVertex> visitedStates;
 	private boolean warnedForElementsInIframe = false;
 
-	
 
 	//private StateFlowGraph oldSFG = null;
 
@@ -218,11 +213,23 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 				case "By.name":
 					webElement = browser.getBrowser().findElement(By.name(value));
 					break;
+				case "By.xpath":
+					webElement = browser.getBrowser().findElement(By.xpath(value));
+					break;
+				case "By.tag":
+					webElement = browser.getBrowser().findElement(By.tagName(value));
+					break;
+				case "By.class":
+					webElement = browser.getBrowser().findElement(By.className(value));
+					break;
 				case "By.cssSelector":
 					webElement = browser.getBrowser().findElement(By.cssSelector(value));
 					break;
 				case "By.linkText":
 					webElement = browser.getBrowser().findElement(By.linkText(value));
+					break;
+				case "By.partiallinktext":
+					webElement = browser.getBrowser().findElement(By.partialLinkText(value));
 					break;
 				case "clear":
 					webElement.clear();
