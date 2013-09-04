@@ -22,6 +22,7 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 
 import org.apache.commons.lang3.SerializationUtils;
+import org.junit.runner.JUnitCore;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.Point;
@@ -31,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
+
 
 import com.crawljax.browser.EmbeddedBrowser;
 import com.crawljax.core.CandidateElement;
@@ -54,10 +56,9 @@ import com.crawljax.core.state.Identification;
 import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.Eventable.EventType;
+import com.crawljax.plugins.utils.Utils;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
-import com.crawljax.plugins.utils.EventFunctionRelation;
-import com.crawljax.plugins.utils.JSFunctionInfo;
 import com.crawljax.util.DomUtils;
 import com.crawljax.util.XPathHelper;
 import com.fasterxml.jackson.databind.deser.Deserializers;
@@ -77,12 +78,16 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
+	public static final String DISTANCES_ARRAY = "Distances.csv";
+	public static final String[] seleniumDomRelatedMethodCallList = new String[] { "findElement" };
+	public static final String[] ELEMENTS_NOT_COUNT = new String[] { "p", "form", "tbody", "tabular", "span", "thead", "h1", "h2", "h3", "br", "hr", "code", "i", "kbd", "pre", "small", "strong", "abbr", "ul", "ol", "dl", "th", "select" };
+	public static final String[] ELEMENTS_TO_COUNT = new String[] { "div", "input", "a", "li", "td", "tr", "table", "option", "img", "dt", "iframe", "textarea" };
+	public static final String INJECT_ELEMENT_ACCESS_JS = "elementaccessinject.js";
+
 	private final ConcurrentMap<String, StateVertex> visitedStates;
 	private boolean warnedForElementsInIframe = false;
 
 	
-	// The event-function relation table EFT stores which functions were executed as a result of firing an event
-	private ArrayList<EventFunctionRelation> newEFT = new ArrayList<EventFunctionRelation>();
 
 	//private StateFlowGraph oldSFG = null;
 
@@ -104,17 +109,29 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("TestSuiteExtension plugin started");
 
-		File folder = new File("/Users/aminmf/testsuiteextension-plugin/src/main/java/casestudies/originaltests/");
-		
-		// TODO: Instrumenting unit test files
-		LOG.info("Instrumenting unit test files...");
-		
-		
-		
-		// Compiling the instrumented unit test files
-		LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
-
 		try {
+			File folder = new File("/Users/aminmf/testsuiteextension-plugin/src/main/java/casestudies/originaltests/");
+
+			// TODO: Instrumenting unit test files and save them in another folder
+			LOG.info("Instrumenting unit test files...");
+			/**
+			 * The pattern to be saved in the log file is as following:
+			 * "TestSuiteBegin"
+			 * "NewTestCase"
+			 * By.id("login")
+			 * clear, senkeys, ....
+			 * ...
+			 * "NewTestCase"
+			 * 
+			 * "TestSuiteEnd"
+			 */
+
+
+
+
+			// Compiling the instrumented unit test files
+			LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
+
 			File[] listOfFiles = folder.listFiles(new FilenameFilter() {
 		                  public boolean accept(File file, String name) {
 		                      return name.endsWith(".java");
@@ -139,39 +156,97 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 			}    
 
 			fileManager.close();
+		
+			// Executing the instrumented unit test files. This will produce a log of the execution trace
+			LOG.info("Executing the instrumented unit test files and logging the execution trace...");
+			for (File file : listOfFiles) {
+			    if (file.isFile()) {
+			    	executeUnitTest(file.getName());
+					LOG.info("Executing unit test in {}", file.getName());
+			    }
+			}
+
+		
+		
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
-		// TODO: Executing the instrumented unit test files and logging the execution trace
-		LOG.info("Executing the instrumented unit test files and logging the execution trace...");	
 		
-		// TODO: Re-executing based on the execution log to generate initial paths for the SFG
-		LOG.info("Re-executing based on the execution log to generate initial paths for the SFG...");	
-		
-		// TODO: Creating a SFG with initial paths based on executed instrumented code
-		LOG.info("Creating a SFG with initial paths based on executed instrumented code...");
-		
+				
 	}
 
 
+	public void executeUnitTest(String fileName) {
+		try {
+			Class<?> forName = Class.forName(fileName);
+			JUnitCore.runClasses(forName);
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	
 	/**
 	 * Executes happy paths only once after the index state was created.
 	 */
 	@Override
 	public void initialPathExecution(CrawljaxConfiguration conf, CrawlTaskConsumer firstConsumer) {
-		WebElement webElement = null;
-		LOG.debug("Setting up initial crawl paths from test cases");
-
-		// Reseting the crawler before each test case
-		firstConsumer.getCrawler().reset();
 
 		browser = firstConsumer.getContext().getBrowser();
 		config = conf;
+
+		// Re-executing based on the execution log to generate initial paths for the SFG
+		LOG.info("Re-executing Selenium commands based on the execution log to generate initial paths for the SFG...");	
+
+
+		WebElement webElement = null;
+		Eventable event = null;
+		// TODO: Reading from the log file...
+		String command = null;
+		while(!command.equals("TestSuiteEnd")){
+			if (command.equals("NewTestCase")){
+				// Reseting the crawler before each test case
+				firstConsumer.getCrawler().reset();
+			}
+			// read the value such as id, cssSelector, xpath, and etc. 
+			String value = null;
+			switch (command){
+				case "By.id":
+					webElement = browser.getBrowser().findElement(By.id(value));
+					break;
+				case "By.name":
+					webElement = browser.getBrowser().findElement(By.name(value));
+					break;
+				case "By.cssSelector":
+					webElement = browser.getBrowser().findElement(By.cssSelector(value));
+					break;
+				case "By.linkText":
+					webElement = browser.getBrowser().findElement(By.linkText(value));
+					break;
+				case "clear":
+					webElement.clear();
+					break;
+				case "sendKeys":
+					webElement.sendKeys(value);
+					break;
+				case "click":
+					webElement.sendKeys(value);
+					// generate corresponding Eventable for webElement
+					event = getCorrespondingEventable(webElement, EventType.click, browser);
+					webElement.click();
+					// inspecting DOM changes and adding to SFG
+					firstConsumer.getCrawler().inspectNewState(event);
+					break;
+				default:
+			}
+
+
+		}
+
 		
 		// This comes from Selenium test cases
-		webElement = browser.getBrowser().findElement(By.id("login"));
+		/*webElement = browser.getBrowser().findElement(By.id("login"));
 		webElement.clear();
 		webElement = browser.getBrowser().findElement(By.id("login"));
 		webElement.sendKeys("nainy");
@@ -181,26 +256,16 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		webElement.sendKeys("nainy");
 		webElement = browser.getBrowser().findElement(By.cssSelector("button[type=\"submit\"]"));
 
-		// generate corresponding Eventable for webElement
 		Eventable event = getCorrespondingEventable(webElement, EventType.click, browser);
 
-		// This comes from Selenium test cases
-		webElement.click();
-
-		// inspecting DOM changes and adding to SFG
-		firstConsumer.getCrawler().inspectNewState(event);
-
-		// This comes from Selenium test cases
-		webElement = browser.getBrowser().findElement(By.linkText("Logout"));
-
-		// generate corresponding Eventable for webElement
-		event = getCorrespondingEventable(webElement, EventType.click, browser);
-
 		webElement.click();
 
 		firstConsumer.getCrawler().inspectNewState(event);
+		*/
 
+		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
 	}
+	
 	//Amin
 	private Eventable getCorrespondingEventable(WebElement webElement, EventType eventType, EmbeddedBrowser browser) {
 		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, browser);
@@ -384,34 +449,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 			LOG.info("ERROR!");
 		 */
 		
-		// Save the EFT to file
-		String eftFileName = "eft.ser";
-		try {
-			fos = new FileOutputStream(eftFileName);
-			out = new ObjectOutputStream(fos);
-			out.writeObject(newEFT);
-			out.close();
-			LOG.info("TestSuiteExtension successfully wrote EFT to eft.ser file");
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-			
-		// Read the EFT from file for testing
-		/*ArrayList<EventFunctionRelation> EFT2 = new ArrayList<EventFunctionRelation>();
-		try {
-			fis = new FileInputStream(eftFileName);
-			in = new ObjectInputStream(fis);
-			EFT2 = (ArrayList<EventFunctionRelation>) in.readObject();
-			in.close();
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-
-		LOG.info("EFT2: " + EFT2);
-		*/
-
-			
-		
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
 
@@ -463,9 +500,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
 
-		// Create an event-function relation and add it to the EFT table
-		EventFunctionRelation newRelation = new EventFunctionRelation(eventable, stateBefore, stateAfter, executedJSFunctions);
-		newEFT.add(newRelation);
 	}
 
 

@@ -88,6 +88,11 @@
 			<version>${selenium.version}</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>com.google.code.javaparser</groupId>
+			<artifactId>javaparser</artifactId>
+			<version>1.0.9</version>
+		</dependency>
 	</dependencies>
 
 	<build>
