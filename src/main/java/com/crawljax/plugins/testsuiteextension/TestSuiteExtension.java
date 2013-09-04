@@ -3,14 +3,23 @@ package com.crawljax.plugins.testsuiteextension;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+
+import javax.tools.Diagnostic;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.ToolProvider;
 
 import org.apache.commons.lang3.SerializationUtils;
 import org.openqa.selenium.By;
@@ -95,18 +104,53 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("TestSuiteExtension plugin started");
 
-		// TODO: Checking for the instrumented test suite file
-		LOG.info("Checking for the instrumented test suite file...");
+		File folder = new File("/Users/aminmf/testsuiteextension-plugin/src/main/java/casestudies/originaltests/");
 		
-		// IF FOUND!
+		// TODO: Instrumenting unit test files
+		LOG.info("Instrumenting unit test files...");
 		
-		// TODO: Executing the instrumented test cases
-		LOG.info("Executing the instrumented test cases...");
 		
+		
+		// Compiling the instrumented unit test files
+		LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
+
+		try {
+			File[] listOfFiles = folder.listFiles(new FilenameFilter() {
+		                  public boolean accept(File file, String name) {
+		                      return name.endsWith(".java");
+		                  }
+		              });
+
+			for (File file : listOfFiles) {
+			    if (file.isFile()) {
+					LOG.info(file.getName());
+			    }
+			}
+			
+			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+			DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
+			StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, null);
+			Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(listOfFiles));
+			JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, diagnostics, null, null, compilationUnits);
+			boolean success = task.call();
+
+			for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
+				LOG.info("Error on line {} in {}", diagnostic.getLineNumber(), diagnostic.getSource().toString());
+			}    
+
+			fileManager.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		// TODO: Executing the instrumented unit test files and logging the execution trace
+		LOG.info("Executing the instrumented unit test files and logging the execution trace...");	
+		
+		// TODO: Re-executing based on the execution log to generate initial paths for the SFG
+		LOG.info("Re-executing based on the execution log to generate initial paths for the SFG...");	
 		
 		// TODO: Creating a SFG with initial paths based on executed instrumented code
 		LOG.info("Creating a SFG with initial paths based on executed instrumented code...");
-
 		
 	}
 
@@ -258,14 +302,10 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	} 
 	
 	
-
-
 	
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 	}
-
-
 
 	/**
 	 * Logs all the candidate elements so that the plugin knows which elements were the candidate
