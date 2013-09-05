@@ -22,8 +22,16 @@ public class test {
 	
 	public static void main(String[] args) {
 		try {
-			File folder = new File("/Users/aminmf/testsuiteextension-plugin/src/main/java/casestudies/originaltests/");
+			String folderLoc = System.getProperty("user.dir");
+			// On Linux/Mac
+			//dir.concat("/src/main/java/casestudies/originaltests/");
+			// On Windows
+			folderLoc += "\\src\\main\\java\\casestudies\\originaltests\\";
 
+			File folder = new File(folderLoc);
+			
+			System.out.println(folderLoc);
+			
 			// Compiling the instrumented unit test files
 			LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
 
@@ -40,7 +48,11 @@ public class test {
 			    }
 			}
 			
-			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+			System.out.println(System.getProperty("java.home"));
+			
+			System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
+					
+			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();			
 			DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
 			StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, null);
 			Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(listOfFiles));
@@ -51,6 +63,7 @@ public class test {
 			
 			for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
 				LOG.info("Error on line {} in {}", diagnostic.getLineNumber(), diagnostic.getSource().toString());
+				System.out.println("Error on line " + diagnostic.getLineNumber() + " in " + diagnostic.getSource().toString());
 			}    
 
 			fileManager.close();
@@ -60,8 +73,10 @@ public class test {
 				LOG.info("Executing the instrumented unit test files and logging the execution trace...");
 				for (File file : listOfFiles) {
 					if (file.isFile()) {
-						executeUnitTest(file.getName());
-						LOG.info("Executing unit test in {}", file.getName());
+						System.out.println("Executing unit test: " + file.getName());
+						//System.out.println("Executing unit test in " + file.getAbsolutePath());
+						//LOG.info("Executing unit test in {}", file.getName());
+						executeUnitTest(file.getAbsolutePath());
 					}
 				}
 			}
@@ -73,8 +88,10 @@ public class test {
 	}
 
 	
-	public static void executeUnitTest(String fileName) {
+	public static void executeUnitTest(String test) {
 		try {
+			String fileName = getFileFullName(test);
+			System.out.println("Compinling test class: " + fileName);
 			Class<?> forName = Class.forName(fileName);
 			JUnitCore.runClasses(forName);
 		} catch (ClassNotFoundException e) {
@@ -82,4 +99,17 @@ public class test {
 		}
 	}
 	
+	
+	public static String getFileFullName(String file) {
+		file = file.replace(System.getProperty("user.dir"), "");
+		file = file.replace("/src/main/java/", "");
+		// handling windows format
+		file = file.replace("\\src\\main\\java\\", "");
+		file = (file.contains(".")) ? file.substring(0, file.indexOf(".")) : file;
+		file = file.replace("/", ".");
+		file = file.replace("\\", ".");
+		System.out.println(file);
+		return file;
+	}
+
 }
