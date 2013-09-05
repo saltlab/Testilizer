@@ -24,8 +24,6 @@ import javax.tools.ToolProvider;
 import org.apache.commons.lang3.SerializationUtils;
 import org.junit.runner.JUnitCore;
 import org.openqa.selenium.By;
-import org.openqa.selenium.Dimension;
-import org.openqa.selenium.Point;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
@@ -55,7 +53,6 @@ import com.crawljax.core.state.Identification;
 import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.Eventable.EventType;
-import com.crawljax.plugins.utils.Utils;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.util.DomUtils;
@@ -64,8 +61,6 @@ import com.fasterxml.jackson.databind.deser.Deserializers;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 /**
@@ -73,13 +68,12 @@ import com.google.common.collect.Maps;
  * It initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.
  **/
 public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
-PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin{
+PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin{
 
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
 	private final ConcurrentMap<String, StateVertex> visitedStates;
 	private boolean warnedForElementsInIframe = false;
-
 
 	//private StateFlowGraph oldSFG = null;
 
@@ -92,8 +86,8 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		visitedStates = Maps.newConcurrentMap();
 		LOG.info("Initialized the TestSuiteExtension plugin");
 	}
-
 	
+
 	/**
 	 * Initializing the SFG with Selenium test cases
 	 */
@@ -102,8 +96,17 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		LOG.info("TestSuiteExtension plugin started");
 
 		try {
-			File folder = new File("/Users/aminmf/testsuiteextension-plugin/src/main/java/casestudies/originaltests/");
+			String folderLoc = System.getProperty("user.dir");
+			// On Linux/Mac
+			//dir.concat("/src/main/java/casestudies/originaltests/");
+			// On Windows
+			folderLoc += "\\src\\main\\java\\casestudies\\originaltests\\";
 
+			File folder = new File(folderLoc);
+			
+			System.out.println(folderLoc);
+			
+			
 			// TODO: Instrumenting unit test files and save them in another folder
 			LOG.info("Instrumenting unit test files...");
 			/**
@@ -117,13 +120,11 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 			 * 
 			 * "TestSuiteEnd"
 			 */
-
-
-
-
+			
 			// Compiling the instrumented unit test files
-			LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
+			//LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
 
+			
 			File[] listOfFiles = folder.listFiles(new FilenameFilter() {
 		                  public boolean accept(File file, String name) {
 		                      return name.endsWith(".java");
@@ -132,50 +133,73 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 
 			for (File file : listOfFiles) {
 			    if (file.isFile()) {
+			    	System.out.println(file.getName());
 					LOG.info(file.getName());
 			    }
 			}
 			
-			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+			System.out.println(System.getProperty("java.home"));
+			
+			// making sure to use jdk and not jre
+			System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
+					
+			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();			
 			DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
 			StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, null);
 			Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(listOfFiles));
 			JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, diagnostics, null, null, compilationUnits);
 			boolean success = task.call();
-
+			
+			System.out.println(success);
+			
 			for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
 				LOG.info("Error on line {} in {}", diagnostic.getLineNumber(), diagnostic.getSource().toString());
+				System.out.println("Error on line " + diagnostic.getLineNumber() + " in " + diagnostic.getSource().toString());
 			}    
 
 			fileManager.close();
-		
-			// Executing the instrumented unit test files. This will produce a log of the execution trace
-			LOG.info("Executing the instrumented unit test files and logging the execution trace...");
-			for (File file : listOfFiles) {
-			    if (file.isFile()) {
-			    	executeUnitTest(file.getName());
-					LOG.info("Executing unit test in {}", file.getName());
-			    }
+
+			if(success){
+				// Executing the instrumented unit test files. This will produce a log of the execution trace
+				LOG.info("Executing the instrumented unit test files and logging the execution trace...");
+				for (File file : listOfFiles) {
+					if (file.isFile()) {
+						System.out.println("Executing unit test: " + file.getName());
+						//System.out.println("Executing unit test in " + file.getAbsolutePath());
+						//LOG.info("Executing unit test in {}", file.getName());
+						executeUnitTest(file.getAbsolutePath());
+					}
+				}
 			}
 
-		
-		
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
-		
-				
 	}
 
-
-	public void executeUnitTest(String fileName) {
+	public static void executeUnitTest(String test) {
 		try {
+			String fileName = getFileFullName(test);
+			System.out.println("Compinling test class: " + fileName);
 			Class<?> forName = Class.forName(fileName);
 			JUnitCore.runClasses(forName);
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	
+	public static String getFileFullName(String file) {
+		file = file.replace(System.getProperty("user.dir"), "");
+		file = file.replace("/src/main/java/", "");
+		// handling windows format
+		file = file.replace("\\src\\main\\java\\", "");
+		file = (file.contains(".")) ? file.substring(0, file.indexOf(".")) : file;
+		file = file.replace("/", ".");
+		file = file.replace("\\", ".");
+		System.out.println(file);
+		return file;
 	}
 	
 	
@@ -270,7 +294,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
 	}
 	
-	//Amin
 	private Eventable getCorrespondingEventable(WebElement webElement, EventType eventType, EmbeddedBrowser browser) {
 		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, browser);
 		Eventable event = new Eventable(candidateElement, eventType);
@@ -278,7 +301,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		return event;
 	}
 
-	//Amin
 	private CandidateElement getCorrespondingCandidateElement(WebElement webElement, EmbeddedBrowser browser) {
 		Document dom;
 		
@@ -314,7 +336,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		return null;
 	}
 
-	//Amin
 	private boolean checkEqulity(WebElement webElement,	org.w3c.dom.Element sourceElement) {
 		
 		//get xpath of the WebElement
@@ -340,7 +361,6 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 		return false;
 	}
 
-	//Amin
 	public String getXPath(WebElement element) {
 
 		String jscript = "function getElementXPath(elt) " +   
@@ -389,29 +409,9 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 
 	}
 
-	private WebElement getWebElement(EmbeddedBrowser browser, CandidateElement element) {
-		try {
-			if (!Strings.isNullOrEmpty(element.getRelatedFrame())) {
-				warnUserForInvisibleElements();
-				return null;
-			} else {
-				return browser.getWebElement(element.getIdentification());
-			}
-		} catch (WebDriverException e) {
-			LOG.info("Could not locate element for positioning {}", element);
-			return null;
-		}
-	}
-
-	private void warnUserForInvisibleElements() {
-		if (!warnedForElementsInIframe) {
-			LOG.warn("Some elemnts are in an iFrame. We cannot display it in the Crawl overview");
-			warnedForElementsInIframe = true;
-		}
-	}
 
 	/**
-	 * Generated the report.
+	 * Generates the report.
 	 */
 	@Override
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
@@ -462,23 +462,12 @@ PostCrawlingPlugin, OnFireEventFailedPlugin, OnUrlLoadPlugin, OnFireEventSucceed
 	}
 
 	@Override
-	public void onFireEventFailed(CrawlerContext context, Eventable eventable,
-			List<Eventable> pathToFailure) {
-		return;
-	}
-
-	@Override
 	public void onUrlLoad(CrawlerContext context) {
 		// TODO Reset for crawling from states in the happy paths
 	}
 
 	/**
 	 * After a successful event firing, calculate the code coverage
-	 * 
-	 * @param context
-	 * @param stateBefore
-	 * @param eventable
-	 * @param stateAfter
 	 */
 	@Override
 	public void onFireEvent(CrawlerContext context, StateVertex stateBefore,
