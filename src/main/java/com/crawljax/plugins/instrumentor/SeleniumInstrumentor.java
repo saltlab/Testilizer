@@ -2,10 +2,13 @@ package com.crawljax.plugins.instrumentor;
 
 import japa.parser.ParseException;
 import japa.parser.ast.CompilationUnit;
+import japa.parser.ast.PackageDeclaration;
 import japa.parser.ast.body.MethodDeclaration;
 import japa.parser.ast.expr.Expression;
 import japa.parser.ast.expr.MethodCallExpr;
+import japa.parser.ast.expr.NameExpr;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -42,16 +45,16 @@ public class SeleniumInstrumentor {
 	}
 
 	
-	public void instrument(String fileName) {
-		LOG.info("Instrumenting the Selenium test cases in {}", fileName);
-		instrument(fileName, true);
+	public void instrument(File file) {
+		LOG.info("Instrumenting the Selenium test cases in {}", file.getAbsolutePath());
+		instrument(file, true);
 	}
 
-	public void instrument(String fileName, boolean writeBack) {
+	public void instrument(File file, boolean writeBack) {
 		try {
 			TestCaseParser tcp = new TestCaseParser();
 			CompilationUnit cu;
-			cu = TestCaseParser.getCompilationUnitOfFileName(fileName);
+			cu = TestCaseParser.getCompilationUnitOfFileName(file.getAbsolutePath());
 
 			HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> srmce = tcp.getSeleniumDomRelateMethodCallExpressions(cu);
 
@@ -63,9 +66,22 @@ public class SeleniumInstrumentor {
 					System.out.println(mce);
 				}
 			}
-			if (writeBack == true)
-				CompilationUnitUtils.writeCompilationUnitToFile(cu, fileName);
-			LOG.info("done writing");
+			if (writeBack == true){
+	
+				String newFileLoc = System.getProperty("user.dir");
+				// On Linux/Mac
+				//newFileLoc.concat("/src/main/java/casestudies/originaltests/");
+				// On Windows
+				newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
+
+				
+				
+				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
+				
+				cu.setPackage(new PackageDeclaration(new NameExpr("casestudies.instrumentedtests")));
+				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName());
+				LOG.info("done writing");
+			}
 
 		} catch (FileNotFoundException e1) {
 			// TODO Auto-generated catch block

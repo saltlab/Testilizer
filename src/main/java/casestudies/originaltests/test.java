@@ -79,7 +79,7 @@ public class test {
 				for (File file : listOfFiles) {
 					if (file.isFile()) {
 						
-						SI.instrument(file.getAbsolutePath());
+						SI.instrument(file);
 						
 						System.out.println("Executing unit test: " + file.getName());
 						//System.out.println("Executing unit test in " + file.getAbsolutePath());
