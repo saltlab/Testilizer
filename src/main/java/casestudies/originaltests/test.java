@@ -16,11 +16,16 @@ import org.junit.runner.JUnitCore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.crawljax.plugins.instrumentor.SeleniumInstrumentor;
+
 public class test {
 
 	private static final Logger LOG = LoggerFactory.getLogger(test.class);
 	
 	public static void main(String[] args) {
+		
+		SeleniumInstrumentor SI = new SeleniumInstrumentor();
+
 		try {
 			String folderLoc = System.getProperty("user.dir");
 			// On Linux/Mac
@@ -73,11 +78,18 @@ public class test {
 				LOG.info("Executing the instrumented unit test files and logging the execution trace...");
 				for (File file : listOfFiles) {
 					if (file.isFile()) {
+						
+						SI.instrument(file.getAbsolutePath());
+						
 						System.out.println("Executing unit test: " + file.getName());
 						//System.out.println("Executing unit test in " + file.getAbsolutePath());
 						//LOG.info("Executing unit test in {}", file.getName());
-						executeUnitTest(file.getAbsolutePath());
+						
+						//executeUnitTest(file.getAbsolutePath());
 					}
+					
+					break; // just to test one case...
+					
 				}
 			}
 
@@ -91,7 +103,7 @@ public class test {
 	public static void executeUnitTest(String test) {
 		try {
 			String fileName = getFileFullName(test);
-			System.out.println("Compinling test class: " + fileName);
+			System.out.println("Executing test class: " + fileName);
 			Class<?> forName = Class.forName(fileName);
 			JUnitCore.runClasses(forName);
 		} catch (ClassNotFoundException e) {
@@ -108,7 +120,6 @@ public class test {
 		file = (file.contains(".")) ? file.substring(0, file.indexOf(".")) : file;
 		file = file.replace("/", ".");
 		file = file.replace("\\", ".");
-		System.out.println(file);
 		return file;
 	}
 

@@ -28,7 +28,7 @@ public class SeleniumInstrumentor {
 	private static final Logger LOG = LoggerFactory.getLogger(SeleniumInstrumentor.class);
 
 	private static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
-	private FileOutputStream fos = null;
+	private static FileOutputStream fos = null;
 	private static ObjectOutputStream out = null;
 
 	public SeleniumInstrumentor() {
@@ -57,6 +57,7 @@ public class SeleniumInstrumentor {
 
 			for (MethodDeclaration e : srmce.keySet()) {
 				LOG.info("testcase: {}", e.getName());
+				System.out.println("testcase: " + e.getName());
 				for (MethodCallExpr mce : srmce.get(e)) {
 					this.instrumentMethodCall(mce);
 					System.out.println(mce);
@@ -100,8 +101,13 @@ public class SeleniumInstrumentor {
 	// should be static to be used by instrumented test cases
 	public static By getBy(By by) {
 		try {
-			out.writeObject(by);
+			fos = new FileOutputStream(seleniumExecutionTrace);
+			out = new ObjectOutputStream(fos);
+
+			
+			out.writeObject(by.toString());
 			LOG.info("Successfully wrote {} to {} file" , by, seleniumExecutionTrace);
+			System.out.println("Successfully wrote " + by + " to " + seleniumExecutionTrace);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -112,6 +118,10 @@ public class SeleniumInstrumentor {
 	// should be static to be used by instrumented test cases
 	public static String getInput(String input) {
 		try {
+
+			fos = new FileOutputStream(seleniumExecutionTrace);
+			out = new ObjectOutputStream(fos);
+			
 			out.writeObject(input);
 			LOG.info("Successfully wrote {} to {} file" , input, seleniumExecutionTrace);
 		} catch (IOException e) {

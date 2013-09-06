@@ -177,7 +177,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public static void executeUnitTest(String test) {
 		try {
 			String fileName = getFileFullName(test);
-			System.out.println("Compinling test class: " + fileName);
+			System.out.println("Executing test class: " + fileName);
 			Class<?> forName = Class.forName(fileName);
 			JUnitCore.runClasses(forName);
 		} catch (ClassNotFoundException e) {
@@ -193,7 +193,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		file = (file.contains(".")) ? file.substring(0, file.indexOf(".")) : file;
 		file = file.replace("/", ".");
 		file = file.replace("\\", ".");
-		System.out.println(file);
 		return file;
 	}
 	
