@@ -41,7 +41,6 @@ import com.crawljax.core.ExitNotifier.ExitStatus;
 import com.crawljax.core.configuration.CrawlElement;
 import com.crawljax.core.configuration.CrawljaxConfiguration;
 import com.crawljax.core.plugin.ExecuteInitialPathsPlugin;
-import com.crawljax.core.plugin.OnFireEventFailedPlugin;
 import com.crawljax.core.plugin.OnFireEventSucceededPlugin;
 import com.crawljax.core.plugin.OnNewStatePlugin;
 import com.crawljax.core.plugin.OnUrlLoadPlugin;
@@ -72,9 +71,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
-	private final ConcurrentMap<String, StateVertex> visitedStates;
-	private boolean warnedForElementsInIframe = false;
-
 	//private StateFlowGraph oldSFG = null;
 
 	private EmbeddedBrowser browser = null;
@@ -83,7 +79,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public TestSuiteExtension(File outputFolder) {
 		Preconditions
 		.checkNotNull(outputFolder, "Output folder cannot be null");
-		visitedStates = Maps.newConcurrentMap();
+		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
 	}
 	
@@ -189,7 +185,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 	}
 	
-	
 	public static String getFileFullName(String file) {
 		file = file.replace(System.getProperty("user.dir"), "");
 		file = file.replace("/src/main/java/", "");
@@ -273,24 +268,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 		
-		// This comes from Selenium test cases
-		/*webElement = browser.getBrowser().findElement(By.id("login"));
-		webElement.clear();
-		webElement = browser.getBrowser().findElement(By.id("login"));
-		webElement.sendKeys("nainy");
-		webElement = browser.getBrowser().findElement(By.id("password"));
-		webElement.clear();
-		webElement = browser.getBrowser().findElement(By.id("password"));
-		webElement.sendKeys("nainy");
-		webElement = browser.getBrowser().findElement(By.cssSelector("button[type=\"submit\"]"));
-
-		Eventable event = getCorrespondingEventable(webElement, EventType.click, browser);
-
-		webElement.click();
-
-		firstConsumer.getCrawler().inspectNewState(event);
-		*/
-
 		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
 	}
 	
@@ -494,7 +471,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
 
 	}
-
 
 
 }
