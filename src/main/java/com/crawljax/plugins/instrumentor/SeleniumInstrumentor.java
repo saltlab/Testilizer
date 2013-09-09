@@ -1,6 +1,7 @@
 package com.crawljax.plugins.instrumentor;
 
 import japa.parser.ASTHelper;
+import japa.parser.JavaParser;
 import japa.parser.ParseException;
 import japa.parser.ast.CompilationUnit;
 import japa.parser.ast.PackageDeclaration;
@@ -8,12 +9,14 @@ import japa.parser.ast.body.ClassOrInterfaceDeclaration;
 import japa.parser.ast.body.MethodDeclaration;
 import japa.parser.ast.body.ModifierSet;
 import japa.parser.ast.body.Parameter;
+import japa.parser.ast.body.TypeDeclaration;
 import japa.parser.ast.expr.Expression;
 import japa.parser.ast.expr.FieldAccessExpr;
 import japa.parser.ast.expr.MethodCallExpr;
 import japa.parser.ast.expr.NameExpr;
 import japa.parser.ast.expr.StringLiteralExpr;
 import japa.parser.ast.stmt.BlockStmt;
+import japa.parser.ast.stmt.Statement;
 import japa.parser.ast.type.PrimitiveType;
 import japa.parser.ast.type.Type;
 import japa.parser.ast.type.PrimitiveType.Primitive;
@@ -26,17 +29,20 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.StringReader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Scanner;
 
 import org.openqa.selenium.By;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.crawljax.plugins.utils.CompilationUnitUtils;
+
 
 
 public class SeleniumInstrumentor {
@@ -78,55 +84,47 @@ public class SeleniumInstrumentor {
 					this.instrumentMethodCall(mce);
 					System.out.println(mce);
 				}
+				
+				// at the end of each method
+		        //Statement st = JavaParser.parseStatement("System.out.println(\"INJECTED!\");\n");        
+		        //ASTHelper.addStmt(e.getBody(), st);
+
+				
 			}
 			
 			// TODO: add method 
-
-	        // create the type declaration 
-	        //ClassOrInterfaceDeclaration type = new ClassOrInterfaceDeclaration(ModifierSet.PUBLIC, false, "GeneratedClass");
-	        //ASTHelper.addTypeDeclaration(cu, type);
-
-
-			// create a method	
-			MethodDeclaration method = new MethodDeclaration(ModifierSet.PUBLIC, ASTHelper.VOID_TYPE, "main");
-	        //method.setModifiers(ModifierSet.addModifier(method.getModifiers(), ModifierSet.STATIC));
-	        ASTHelper.addMember(cu.getTypes().get(0), method);
-
-	        // add a parameter to the method
-	        Parameter param = ASTHelper.createParameter(ASTHelper.createReferenceType("String", 0), "args");
-	        param.setVarArgs(true);
-	        ASTHelper.addParameter(method, param);
-
-	        // add a body to the method
-	        BlockStmt block = new BlockStmt();
-	        method.setBody(block);
-
-	        // add a statement do the method body
-	        NameExpr clazz = new NameExpr("System");
-	        FieldAccessExpr field = new FieldAccessExpr(clazz, "out");
-	        MethodCallExpr call = new MethodCallExpr(field, "println");
-	        ASTHelper.addArgument(call, new StringLiteralExpr("Hello World!"));
-	        ASTHelper.addStmt(block, call);
-
 			
-			// TODO: driver.findElement((By.id("login"))).X(clear,driver.findElement((By.id("login"))));
+			 //String text = new Scanner(new File("methodsToInject.txt") ).useDelimiter("\\A").next();
 			
+	        
+	        CompilationUnit unitToInject = JavaParser.parse(new StringReader(new StringBuilder()
+	        .append("public class Tracker {\n")
+	        .append("  public static void main(String[] args) {\n")
+	        .append("    System.out.println(\"hello, world\");\n")
+	        .append("  }\n")
+	        .append("}\n").toString()));
+
+       
 			
 			
 			if (writeBack == true){
 	
 				String newFileLoc = System.getProperty("user.dir");
 				// On Linux/Mac
-				//newFileLoc.concat("/src/main/java/casestudies/originaltests/");
+				newFileLoc += "/src/main/java/casestudies/instrumentedtests/";
 				// On Windows
-				newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
+				//newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
 
 				
 				
 				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
 				
 				cu.setPackage(new PackageDeclaration(new NameExpr("casestudies.instrumentedtests")));
-				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName());
+				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
+				CompilationUnitUtils.writeCompilationUnitToFile(unitToInject, newFileLoc+file.getName(), true);
+				
+				
+				
 				LOG.info("done writing");
 			}
 
@@ -215,6 +213,11 @@ public class SeleniumInstrumentor {
 			ex.printStackTrace();
 		}		
 	}
-	
 
+
+	public static By foundClear(By by) {
+		System.out.println("clear");
+		return by;
+	}
+	
 }

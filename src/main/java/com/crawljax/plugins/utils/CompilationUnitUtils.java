@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,12 +42,12 @@ public class CompilationUnitUtils {
 		return testMethodsOfCompilationUnit;
 	}
 
-	public static void writeCompilationUnitToFile(CompilationUnit cu, String fileName) {
+	public static void writeCompilationUnitToFile(CompilationUnit cu, String fileName, boolean append) {
 		
 		try {
 			FileInputStream in = new FileInputStream(fileName);
 			try {
-				FileUtils.writeStringToFile(new File(fileName), cu.toString());
+				FileUtils.writeStringToFile(new File(fileName), cu.toString(), append);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
