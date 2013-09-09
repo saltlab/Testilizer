@@ -1,16 +1,29 @@
 package com.crawljax.plugins.instrumentor;
 
+import japa.parser.ASTHelper;
 import japa.parser.ParseException;
 import japa.parser.ast.CompilationUnit;
 import japa.parser.ast.PackageDeclaration;
+import japa.parser.ast.body.ClassOrInterfaceDeclaration;
 import japa.parser.ast.body.MethodDeclaration;
+import japa.parser.ast.body.ModifierSet;
+import japa.parser.ast.body.Parameter;
 import japa.parser.ast.expr.Expression;
+import japa.parser.ast.expr.FieldAccessExpr;
 import japa.parser.ast.expr.MethodCallExpr;
 import japa.parser.ast.expr.NameExpr;
+import japa.parser.ast.expr.StringLiteralExpr;
+import japa.parser.ast.stmt.BlockStmt;
+import japa.parser.ast.type.PrimitiveType;
+import japa.parser.ast.type.Type;
+import japa.parser.ast.type.PrimitiveType.Primitive;
+import japa.parser.ast.visitor.GenericVisitor;
+import japa.parser.ast.visitor.VoidVisitor;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.text.SimpleDateFormat;
@@ -66,6 +79,40 @@ public class SeleniumInstrumentor {
 					System.out.println(mce);
 				}
 			}
+			
+			// TODO: add method 
+
+	        // create the type declaration 
+	        //ClassOrInterfaceDeclaration type = new ClassOrInterfaceDeclaration(ModifierSet.PUBLIC, false, "GeneratedClass");
+	        //ASTHelper.addTypeDeclaration(cu, type);
+
+
+			// create a method	
+			MethodDeclaration method = new MethodDeclaration(ModifierSet.PUBLIC, ASTHelper.VOID_TYPE, "main");
+	        //method.setModifiers(ModifierSet.addModifier(method.getModifiers(), ModifierSet.STATIC));
+	        ASTHelper.addMember(cu.getTypes().get(0), method);
+
+	        // add a parameter to the method
+	        Parameter param = ASTHelper.createParameter(ASTHelper.createReferenceType("String", 0), "args");
+	        param.setVarArgs(true);
+	        ASTHelper.addParameter(method, param);
+
+	        // add a body to the method
+	        BlockStmt block = new BlockStmt();
+	        method.setBody(block);
+
+	        // add a statement do the method body
+	        NameExpr clazz = new NameExpr("System");
+	        FieldAccessExpr field = new FieldAccessExpr(clazz, "out");
+	        MethodCallExpr call = new MethodCallExpr(field, "println");
+	        ASTHelper.addArgument(call, new StringLiteralExpr("Hello World!"));
+	        ASTHelper.addStmt(block, call);
+
+			
+			// TODO: driver.findElement((By.id("login"))).X(clear,driver.findElement((By.id("login"))));
+			
+			
+			
 			if (writeBack == true){
 	
 				String newFileLoc = System.getProperty("user.dir");
@@ -104,6 +151,13 @@ public class SeleniumInstrumentor {
 		else if (mce.getName().equals("sendKeys"))
 			codeToInstrument = "com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getInput";
 		
+		
+		// TODO: add method 
+		
+		
+		// TODO: driver.findElement((By.id("login"))).X(clear,driver.findElement((By.id("login"))));
+
+		
 		MethodCallExpr call = new MethodCallExpr(null, codeToInstrument);
 		call.setArgs(oldArgs);
 		// put oldargs as it's argument
@@ -116,34 +170,40 @@ public class SeleniumInstrumentor {
 
 	// should be static to be used by instrumented test cases
 	public static By getBy(By by) {
-		try {
-			fos = new FileOutputStream(seleniumExecutionTrace);
-			out = new ObjectOutputStream(fos);
+		/*try {
+		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //the true will append the new data
+		    fw.write(by.toString() + "\n");//appends the string to the file
+		    fw.close();
 
-			
-			out.writeObject(by.toString());
 			LOG.info("Successfully wrote {} to {} file" , by, seleniumExecutionTrace);
 			System.out.println("Successfully wrote " + by + " to " + seleniumExecutionTrace);
-		} catch (IOException e) {
+			
+		} catch (IOException ioe) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+			ioe.printStackTrace();
+		    System.err.println("IOException: " + ioe.getMessage());
+		}*/
+
+		System.out.println(by.toString());
+
 		return by;
 	}
 	
 	// should be static to be used by instrumented test cases
 	public static String getInput(String input) {
-		try {
+		/*try {
+		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //the true will append the new data
+		    fw.write(input + "\n");//appends the string to the file
+		    fw.close();
 
-			fos = new FileOutputStream(seleniumExecutionTrace);
-			out = new ObjectOutputStream(fos);
-			
-			out.writeObject(input);
 			LOG.info("Successfully wrote {} to {} file" , input, seleniumExecutionTrace);
+
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+		}*/
+		System.out.println("sendKeys: " + input);
+
 		return input;
 	}	
 	
@@ -155,7 +215,6 @@ public class SeleniumInstrumentor {
 			ex.printStackTrace();
 		}		
 	}
-	
 	
 
 }
