@@ -23,9 +23,11 @@ import japa.parser.ast.type.PrimitiveType.Primitive;
 import japa.parser.ast.visitor.GenericVisitor;
 import japa.parser.ast.visitor.VoidVisitor;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
@@ -49,36 +51,49 @@ public class SeleniumInstrumentor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(SeleniumInstrumentor.class);
 
-    //Amin injected
-    public static By lastUsedBy;
-	private static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
+	public static By lastUsedBy;
+	public static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
 
 	public SeleniumInstrumentor() {
 	}
 
-	
+
 	public void instrument(File file) {
 		LOG.info("Instrumenting the Selenium test cases in {}", file.getAbsolutePath());
 		instrument(file, true);
 	}
 
+
+	/**
+	 * The pattern to be saved in the log file is as following:
+	 * "TestSuiteBegin"
+	 * "NewTestCase"
+	 * By.id("login")
+	 * clear, senkeys, ....
+	 * ...
+	 * "NewTestCase"
+	 * 
+	 * "TestSuiteEnd"
+	 */					
 	public void instrument(File file, boolean writeBack) {
 		try {
+			writeToSeleniumExecutionTrace("NewTestCase");
+
 			TestCaseParser tcp = new TestCaseParser();
 			CompilationUnit cu;
 			cu = TestCaseParser.getCompilationUnitOfFileName(file.getAbsolutePath());
-			
+
 			ArrayList<MethodDeclaration> testCases = tcp.getTestMethodDeclaration(cu);
-			
+
 			for (MethodDeclaration testCaseMethod : testCases) {
 				LOG.info("testcase: {}", testCaseMethod.getName());
 				System.out.println("testcase: " + testCaseMethod.getName());
-		
+
 				ArrayList<MethodCallExpr> methodCalls = tcp.getMethodCalls(testCaseMethod, TestCaseParser.seleniumDomRelatedMethodCallList);
 				//for (MethodCallExpr mce : methodCalls)
-        		//	System.out.println(mce);
+				//	System.out.println(mce);
 
-		        // add a body to the method
+				// add a body to the method
 				BlockStmt block = new BlockStmt();
 
 				for (Statement stmt : testCaseMethod.getBody().getStmts()) {
@@ -107,18 +122,18 @@ public class SeleniumInstrumentor {
 				testCaseMethod.setBody(block);
 
 			}
-			
+
 			if (writeBack == true){
 				String newFileLoc = System.getProperty("user.dir");
 				// On Linux/Mac
 				newFileLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/instrumentedtests/";
 				// On Windows
 				//newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
-				
+
 				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
 				cu.setPackage(new PackageDeclaration(new NameExpr("com.crawljax.plugins.testsuiteextension.casestudies.instrumentedtests")));
 				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
-				
+
 				LOG.info("done writing");
 			}
 
@@ -134,29 +149,29 @@ public class SeleniumInstrumentor {
 		}
 	}
 
-	
-	
+
+
 	public void instrument2(File file, boolean writeBack) {
 		try {
 			TestCaseParser tcp = new TestCaseParser();
 			CompilationUnit cu;
 			cu = TestCaseParser.getCompilationUnitOfFileName(file.getAbsolutePath());
-			
+
 			HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> methodCalls = tcp.getSeleniumDomRelateMethodCallExpressions(cu);
-			
+
 			for (MethodDeclaration e : methodCalls.keySet()) {
 				LOG.info("testcase: {}", e.getName());
 				System.out.println("testcase: " + e.getName());
-				
-				
+
+
 				for (MethodCallExpr mce : methodCalls.get(e)) {
 					this.instrumentMethodCall(mce);
 					System.out.println(mce);
 				}
 			}
-			
+
 			if (writeBack == true){
-	
+
 				String newFileLoc = System.getProperty("user.dir");
 				// On Linux/Mac
 				newFileLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/instrumentedtests/";
@@ -164,12 +179,12 @@ public class SeleniumInstrumentor {
 				//newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
 
 				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
-				
+
 				cu.setPackage(new PackageDeclaration(new NameExpr("com.crawljax.plugins.testsuiteextension.casestudies.instrumentedtests")));
 				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
 				//CompilationUnitUtils.writeCompilationUnitToFile(unitToInject, newFileLoc+file.getName(), true);
-				
-				
+
+
 				LOG.info("done writing");
 			}
 
@@ -200,7 +215,7 @@ public class SeleniumInstrumentor {
 		case "clear":
 			System.out.println("mce.getParentNode() is " + mce);
 			System.out.println("mce.getParentNode() is " + mce.getParentNode());
-						
+
 			//mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"clear\")).clear");
 			break;
 		case "click":
@@ -222,23 +237,23 @@ public class SeleniumInstrumentor {
 
 	public static By getBy(By by) {
 		try {
-		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
-		    fw.write(by.toString() + "\n");
-		    fw.close();
+			FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
+			fw.write(by.toString() + "\n");
+			fw.close();
 		} catch (IOException e) {
 			e.printStackTrace();
-		    System.err.println("IOException: " + e.getMessage());
+			System.err.println("IOException: " + e.getMessage());
 		}
 		System.out.println(by.toString());
 		lastUsedBy = by;
 		return by;
 	}
-	
+
 	public static String getInput(String input) {
 		try {
-		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
-		    fw.write("sendKeys: " + input + "\n");
-		    fw.close();
+			FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
+			fw.write("sendKeys: " + input + "\n");
+			fw.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -247,34 +262,56 @@ public class SeleniumInstrumentor {
 		return input;
 	}	
 
-	
+
 	public static By getNextMethod(By by, String method) {
 		try {
-		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
-		    fw.write(method + "\n");
+			FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
+			fw.write(method + "\n");
 			System.out.println("by is" + by.toString());
 			System.out.println(method);
-		    
+
 			fw.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
+
 
 		return by;
 	}
 
 
 	public static void parseStatement(String string) {
+		//TODO: add the code analysis here
+		writeToSeleniumExecutionTrace(string);	
+	}
+
+	public static void writeToSeleniumExecutionTrace(String string) {
 		try {
-		    FileWriter fw = new FileWriter(seleniumExecutionTrace, true); //appending new data
-		    fw.write(string + "\n");
-		    fw.close();
+			FileWriter fw = new FileWriter(seleniumExecutionTrace, true); //appending new data
+			fw.write(string + "\n");
+			fw.close();
 		} catch (IOException e) {
 			e.printStackTrace();
-		    System.err.println("IOException: " + e.getMessage());
-		}	
+			System.err.println("IOException: " + e.getMessage());
+		}
 	}
+
 	
-	
+	public static ArrayList<String> readFromSeleniumExecutionTrace() {
+		ArrayList<String> content = new ArrayList<String>();
+		try {
+			FileReader fileReader = new FileReader(new File(seleniumExecutionTrace));
+			BufferedReader bufferedReader = new BufferedReader(fileReader);
+			String line;
+			while ((line = bufferedReader.readLine()) != null) {
+				//System.out.println("read from the file: " + line);
+				content.add(line);
+			}
+			fileReader.close();
+			return content;
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return content;
+	}
 }

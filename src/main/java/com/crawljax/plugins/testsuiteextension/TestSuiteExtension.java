@@ -3,6 +3,7 @@ package com.crawljax.plugins.testsuiteextension;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -86,7 +87,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	
 
 	/**
-	 * Initializing the SFG with Selenium test cases
+	 * Instrumenting Selenium test suite to get the execution trace
 	 */
 	@Override
 	public void preCrawling(CrawljaxConfiguration config) {
@@ -95,45 +96,65 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
 
 		try {
-			String folderLoc = System.getProperty("user.dir");
+			/**
+			 * (1) Instrumenting original Selenium unit test files
+			 */
+			String originalFolderLoc = System.getProperty("user.dir");
 			// On Linux/Mac
-			folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/originaltests/";
+			//folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/originaltests/";
 			// On Windows
-			//folderLoc += "\\src\\main\\java\\casestudies\\originaltests\\";
+			originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\originaltests\\";
 
-			File folder = new File(folderLoc);
+			File originalFolder = new File(originalFolderLoc);
+			LOG.info("originalFolderLoc: {} " , originalFolderLoc);
 
-			System.out.println(folderLoc);
-
-			// Compiling the instrumented unit test files
-			LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
-
-			File[] listOfFiles = folder.listFiles(new FilenameFilter() {
+			File[] listOfOriginalFiles = originalFolder.listFiles(new FilenameFilter() {
 				public boolean accept(File file, String name) {
 					return name.endsWith(".java");
 				}
 			});
 
-			for (File file : listOfFiles) {
+			SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteBegin");
+
+			for (File file : listOfOriginalFiles) {
 				if (file.isFile()) {
-					System.out.println(file.getName());
-					LOG.info(file.getName());
+					LOG.info("file.getName(): {}", file.getName());
+					SI.instrument(file);
+					break; // instrument only one file...
 				}
 			}
+			
+			/**
+			 * (2) Compiling the instrumented Selenium unit test files
+			 */
+			String instrumentedFolderLoc = System.getProperty("user.dir");
+			// On Linux/Mac
+			//folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/instrumentedtests/";
+			// On Windows
+			instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\instrumentedtests\\";
 
-			System.out.println(System.getProperty("java.home"));
+			File instrumentedFolder = new File(instrumentedFolderLoc);
+			LOG.info("instrumentedFolderLoc: {}" , instrumentedFolderLoc);
+			LOG.info("Compiling the instrumented unit test files located in {}", instrumentedFolder.getAbsolutePath());
 
+			File[] listOfInstrumentedFiles = instrumentedFolder.listFiles(new FilenameFilter() {
+				public boolean accept(File file, String name) {
+					return name.endsWith(".java");
+				}
+			});
+
+			LOG.info(System.getProperty("java.home"));
 			//Not set on my Mac
-			//System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
+			System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
 
 			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();			
 			DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
 			StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, null);
-			Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(listOfFiles));
+			Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(listOfInstrumentedFiles));
 			JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, diagnostics, null, null, compilationUnits);
 			boolean success = task.call();
 
-			System.out.println(success);
+			LOG.info("success = {}", success);
 
 			for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
 				LOG.info("Error on line {} in {}", diagnostic.getLineNumber(), diagnostic.getSource().toString());
@@ -141,38 +162,24 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}    
 
 			fileManager.close();
-
+			
 			// Not set on my Mac
-			//if(success){
+			if(success){
 				// Executing the instrumented unit test files. This will produce a log of the execution trace
 				LOG.info("Instrumenting unit test files and logging the execution trace...");
-				for (File file : listOfFiles) {
+				for (File file : listOfInstrumentedFiles) {
 					if (file.isFile()) {
-
-						SI.instrument(file);
-						/**
-						 * The pattern to be saved in the log file is as following:
-						 * "TestSuiteBegin"
-						 * "NewTestCase"
-						 * By.id("login")
-						 * clear, senkeys, ....
-						 * ...
-						 * "NewTestCase"
-						 * 
-						 * "TestSuiteEnd"
-						 */
-
 						System.out.println("Executing unit test: " + file.getName());
 						System.out.println("Executing unit test in " + file.getAbsolutePath());
 						LOG.info("Executing unit test in {}", file.getName());
 
 						executeUnitTest(file.getAbsolutePath());
 					}
-
 					break; // just to instrument and run one testcase...
-
 				}
-			//}
+			}
+			
+			SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteEnd");
 
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -182,7 +189,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	
 	public static void executeUnitTest(String test) {
 		try {
-			String fileName = getFileFullName(test);
+			String fileName = "com.crawljax.plugins.testsuiteextension." + getFileFullName(test);
 			System.out.println("Executing test class: " + fileName);
 			Class<?> forName = Class.forName(fileName);
 			JUnitCore.runClasses(forName);
@@ -195,14 +202,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		file = file.replace(System.getProperty("user.dir"), "");
 		file = file.replace("/src/main/java/com/crawljax/plugins/testsuiteextension/", "");
 		// handling windows format
-		file = file.replace("\\src\\main\\java\\", "");
+		file = file.replace("\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\", "");
 		file = (file.contains(".")) ? file.substring(0, file.indexOf(".")) : file;
 		file = file.replace("/", ".");
 		file = file.replace("\\", ".");
 		return file;
 	}
 	
-	
+
 	/**
 	 * Executes happy paths only once after the index state was created.
 	 */
@@ -218,6 +225,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		WebElement webElement = null;
 		Eventable event = null;
+		
+		System.out.println(SeleniumInstrumentor.readFromSeleniumExecutionTrace());
+		
 		// TODO: Reading from the log file...
 		String command = null;
 		while(!command.equals("TestSuiteEnd")){
