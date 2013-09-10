@@ -49,18 +49,11 @@ public class SeleniumInstrumentor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(SeleniumInstrumentor.class);
 
+    //Amin injected
+    public static By lastUsedBy;
 	private static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
-	private static FileOutputStream fos = null;
-	private static ObjectOutputStream out = null;
 
 	public SeleniumInstrumentor() {
-		try {
-			fos = new FileOutputStream(seleniumExecutionTrace);
-			out = new ObjectOutputStream(fos);
-		} catch (Exception ex) {
-			// TODO Auto-generated catch block
-			ex.printStackTrace();
-		}
 	}
 
 	
@@ -84,28 +77,7 @@ public class SeleniumInstrumentor {
 					this.instrumentMethodCall(mce);
 					System.out.println(mce);
 				}
-				
-				// at the end of each method
-		        //Statement st = JavaParser.parseStatement("System.out.println(\"INJECTED!\");\n");        
-		        //ASTHelper.addStmt(e.getBody(), st);
-
-				
 			}
-			
-			// TODO: add method 
-			
-			 //String text = new Scanner(new File("methodsToInject.txt") ).useDelimiter("\\A").next();
-			
-	        
-	        CompilationUnit unitToInject = JavaParser.parse(new StringReader(new StringBuilder()
-	        .append("public class Tracker {\n")
-	        .append("  public static void main(String[] args) {\n")
-	        .append("    System.out.println(\"hello, world\");\n")
-	        .append("  }\n")
-	        .append("}\n").toString()));
-
-       
-			
 			
 			if (writeBack == true){
 	
@@ -121,7 +93,7 @@ public class SeleniumInstrumentor {
 				
 				cu.setPackage(new PackageDeclaration(new NameExpr("casestudies.instrumentedtests")));
 				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
-				CompilationUnitUtils.writeCompilationUnitToFile(unitToInject, newFileLoc+file.getName(), true);
+				//CompilationUnitUtils.writeCompilationUnitToFile(unitToInject, newFileLoc+file.getName(), true);
 				
 				
 				
@@ -144,80 +116,79 @@ public class SeleniumInstrumentor {
 		List<Expression> oldArgs = mce.getArgs();
 		// create a methodcall expre
 		String codeToInstrument = null;
-		if (mce.getName().equals("findElement"))
+		String methodCallName = mce.getName();
+		switch(mce.getName()){
+		case "findElement":
 			codeToInstrument = "com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getBy";
-		else if (mce.getName().equals("sendKeys"))
+			break;
+		case "sendKeys":
 			codeToInstrument = "com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getInput";
-		
-		
-		// TODO: add method 
-		
-		
-		// TODO: driver.findElement((By.id("login"))).X(clear,driver.findElement((By.id("login"))));
+			break;
+		case "clear":
+			System.out.println("mce.getParentNode() is " + mce.getParentNode());
 
-		
-		MethodCallExpr call = new MethodCallExpr(null, codeToInstrument);
-		call.setArgs(oldArgs);
-		// put oldargs as it's argument
-		// setarguments of mce
-		List<Expression> newArgs = new ArrayList<Expression>();
-		newArgs.add(call);
-		mce.setArgs(newArgs);
+			mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"clear\")).clear");
+			break;
+		case "click":
+			mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"click\")).click");
+		}
+
+		if (codeToInstrument!=null){
+			MethodCallExpr call = new MethodCallExpr(null, codeToInstrument);
+			call.setArgs(oldArgs);
+			// put oldargs as it's argument
+			// setarguments of mce
+			List<Expression> newArgs = new ArrayList<Expression>();
+			newArgs.add(call);
+			mce.setArgs(newArgs);
+		}
 		return mce;
 	}
 
-	// should be static to be used by instrumented test cases
+
 	public static By getBy(By by) {
-		/*try {
-		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //the true will append the new data
-		    fw.write(by.toString() + "\n");//appends the string to the file
+		try {
+		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
+		    fw.write(by.toString() + "\n");
 		    fw.close();
-
-			LOG.info("Successfully wrote {} to {} file" , by, seleniumExecutionTrace);
-			System.out.println("Successfully wrote " + by + " to " + seleniumExecutionTrace);
-			
-		} catch (IOException ioe) {
-			// TODO Auto-generated catch block
-			ioe.printStackTrace();
-		    System.err.println("IOException: " + ioe.getMessage());
-		}*/
-
+		} catch (IOException e) {
+			e.printStackTrace();
+		    System.err.println("IOException: " + e.getMessage());
+		}
 		System.out.println(by.toString());
-
+		lastUsedBy = by;
 		return by;
 	}
 	
-	// should be static to be used by instrumented test cases
 	public static String getInput(String input) {
-		/*try {
-		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //the true will append the new data
-		    fw.write(input + "\n");//appends the string to the file
+		try {
+		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
+		    fw.write("sendKeys: " + input + "\n");
 		    fw.close();
-
-			LOG.info("Successfully wrote {} to {} file" , input, seleniumExecutionTrace);
-
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}*/
+		}
 		System.out.println("sendKeys: " + input);
 
 		return input;
 	}	
+
 	
-	
-	private void closeFile(){
+	public static By getNextMethod(By by, String method) {
 		try {
-			out.close();
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}		
-	}
+		    FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
+		    fw.write(method + "\n");
+			System.out.println("by is" + by.toString());
+			System.out.println(method);
+		    
+			fw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
 
-
-	public static By foundClear(By by) {
-		System.out.println("clear");
 		return by;
 	}
+	
 	
 }

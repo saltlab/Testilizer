@@ -19,7 +19,7 @@ import com.crawljax.plugins.utils.MethodCallVisitor;
 
 public class TestCaseParser {
 
-	public static final String[] seleniumDomRelatedMethodCallList = new String[] { "findElement", "sendKeys" };
+	public static final String[] seleniumDomRelatedMethodCallList = new String[] { "findElement", "sendKeys", "clear", "click" };
 
 	public HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> getSeleniumDomRelateMethodCallExpressions(CompilationUnit cu) throws FileNotFoundException, ParseException, IOException {
 		ArrayList<MethodDeclaration> testMethodsofCompilationUnit = CompilationUnitUtils.testMethodsofCompilationUnit(cu);
