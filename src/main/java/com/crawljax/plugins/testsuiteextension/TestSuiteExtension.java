@@ -52,6 +52,7 @@ import com.crawljax.core.state.Identification;
 import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.Eventable.EventType;
+import com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.util.DomUtils;
@@ -91,63 +92,49 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("TestSuiteExtension plugin started");
 
+		SeleniumInstrumentor SI = new SeleniumInstrumentor();
+
 		try {
 			String folderLoc = System.getProperty("user.dir");
 			// On Linux/Mac
-			//dir.concat("/src/main/java/casestudies/originaltests/");
+			folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/originaltests/";
 			// On Windows
-			folderLoc += "\\src\\main\\java\\casestudies\\originaltests\\";
+			//folderLoc += "\\src\\main\\java\\casestudies\\originaltests\\";
 
 			File folder = new File(folderLoc);
-			
-			System.out.println(folderLoc);
-			
-			
-			// TODO: Instrumenting unit test files and save them in another folder
-			LOG.info("Instrumenting unit test files...");
-			/**
-			 * The pattern to be saved in the log file is as following:
-			 * "TestSuiteBegin"
-			 * "NewTestCase"
-			 * By.id("login")
-			 * clear, senkeys, ....
-			 * ...
-			 * "NewTestCase"
-			 * 
-			 * "TestSuiteEnd"
-			 */
-			
-			// Compiling the instrumented unit test files
-			//LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
 
-			
+			System.out.println(folderLoc);
+
+			// Compiling the instrumented unit test files
+			LOG.info("Compiling the instrumented unit test files located in {}", folder.getAbsolutePath());
+
 			File[] listOfFiles = folder.listFiles(new FilenameFilter() {
-		                  public boolean accept(File file, String name) {
-		                      return name.endsWith(".java");
-		                  }
-		              });
+				public boolean accept(File file, String name) {
+					return name.endsWith(".java");
+				}
+			});
 
 			for (File file : listOfFiles) {
-			    if (file.isFile()) {
-			    	System.out.println(file.getName());
+				if (file.isFile()) {
+					System.out.println(file.getName());
 					LOG.info(file.getName());
-			    }
+				}
 			}
-			
+
 			System.out.println(System.getProperty("java.home"));
-			
-			// making sure to use jdk and not jre
-			System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
-					
+
+			//Not set on my Mac
+			//System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
+
 			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();			
 			DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
 			StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, null);
 			Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(listOfFiles));
 			JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, diagnostics, null, null, compilationUnits);
 			boolean success = task.call();
-			
+
 			System.out.println(success);
-			
+
 			for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
 				LOG.info("Error on line {} in {}", diagnostic.getLineNumber(), diagnostic.getSource().toString());
 				System.out.println("Error on line " + diagnostic.getLineNumber() + " in " + diagnostic.getSource().toString());
@@ -155,25 +142,44 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			fileManager.close();
 
-			if(success){
+			// Not set on my Mac
+			//if(success){
 				// Executing the instrumented unit test files. This will produce a log of the execution trace
-				LOG.info("Executing the instrumented unit test files and logging the execution trace...");
+				LOG.info("Instrumenting unit test files and logging the execution trace...");
 				for (File file : listOfFiles) {
 					if (file.isFile()) {
+
+						SI.instrument(file);
+						/**
+						 * The pattern to be saved in the log file is as following:
+						 * "TestSuiteBegin"
+						 * "NewTestCase"
+						 * By.id("login")
+						 * clear, senkeys, ....
+						 * ...
+						 * "NewTestCase"
+						 * 
+						 * "TestSuiteEnd"
+						 */
+
 						System.out.println("Executing unit test: " + file.getName());
-						//System.out.println("Executing unit test in " + file.getAbsolutePath());
-						//LOG.info("Executing unit test in {}", file.getName());
+						System.out.println("Executing unit test in " + file.getAbsolutePath());
+						LOG.info("Executing unit test in {}", file.getName());
+
 						executeUnitTest(file.getAbsolutePath());
 					}
+
+					break; // just to instrument and run one testcase...
+
 				}
-			}
+			//}
 
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
 	}
-
+	
 	public static void executeUnitTest(String test) {
 		try {
 			String fileName = getFileFullName(test);
@@ -187,7 +193,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	
 	public static String getFileFullName(String file) {
 		file = file.replace(System.getProperty("user.dir"), "");
-		file = file.replace("/src/main/java/", "");
+		file = file.replace("/src/main/java/com/crawljax/plugins/testsuiteextension/", "");
 		// handling windows format
 		file = file.replace("\\src\\main\\java\\", "");
 		file = (file.contains(".")) ? file.substring(0, file.indexOf(".")) : file;
