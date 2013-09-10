@@ -4,7 +4,9 @@ import japa.parser.JavaParser;
 import japa.parser.ParseException;
 import japa.parser.ast.CompilationUnit;
 import japa.parser.ast.body.MethodDeclaration;
+import japa.parser.ast.expr.Expression;
 import japa.parser.ast.expr.MethodCallExpr;
+import japa.parser.ast.stmt.Statement;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -12,8 +14,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 import com.crawljax.plugins.utils.CompilationUnitUtils;
+import com.crawljax.plugins.utils.StatementVisitor;
 import com.crawljax.plugins.utils.MethodCallVisitor;
 
 
@@ -31,7 +35,7 @@ public class TestCaseParser {
 		HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> domRelateMethodCallExps = new HashMap<MethodDeclaration, ArrayList<MethodCallExpr>>();
 
 		for (MethodDeclaration methodDeclaration : testMethodsofCompilationUnit) {
-			// find location of all findelement methods
+			// find location of all findelement, etc. methods
 			MethodCallVisitor mcv = new MethodCallVisitor();
 			ArrayList<String> elementsToCover = new ArrayList<String>();
 			elementsToCover.addAll(Arrays.asList(methodCalls));
@@ -63,6 +67,30 @@ public class TestCaseParser {
 			in.close();
 		}
 		return cu;
+	}
+
+
+	public ArrayList<MethodDeclaration> getTestMethodDeclaration(CompilationUnit cu) {
+		return CompilationUnitUtils.testMethodsofCompilationUnit(cu);
+	}
+	
+
+	public ArrayList<MethodCallExpr> getMethodCalls(MethodDeclaration methodDeclaration, String[] methodCalls) {
+		// find location of all findelement, etc. methods
+		MethodCallVisitor mcv = new MethodCallVisitor();
+		ArrayList<String> elementsToCover = new ArrayList<String>();
+		elementsToCover.addAll(Arrays.asList(methodCalls));
+		mcv.applyFilter(elementsToCover);
+		mcv.visit(methodDeclaration, null);
+		return mcv.getMethodCallExpressions();
+	}
+
+
+	public ArrayList<Statement> getStatements(MethodDeclaration methodDeclaration) {
+		// find location of all findelement, etc. methods
+		StatementVisitor sv = new StatementVisitor();
+		sv.visit(methodDeclaration, null);
+		return sv.getStatements();
 	}
 
 }

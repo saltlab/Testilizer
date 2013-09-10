@@ -62,18 +62,93 @@ public class SeleniumInstrumentor {
 		instrument(file, true);
 	}
 
+	
+	// new
 	public void instrument(File file, boolean writeBack) {
 		try {
 			TestCaseParser tcp = new TestCaseParser();
 			CompilationUnit cu;
 			cu = TestCaseParser.getCompilationUnitOfFileName(file.getAbsolutePath());
+			
+			ArrayList<MethodDeclaration> testCases = tcp.getTestMethodDeclaration(cu);
 
-			HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> srmce = tcp.getSeleniumDomRelateMethodCallExpressions(cu);
+			
+			for (MethodDeclaration testCaseMethod : testCases) {
+				LOG.info("testcase: {}", testCaseMethod.getName());
+				System.out.println("testcase: " + testCaseMethod.getName());
 
-			for (MethodDeclaration e : srmce.keySet()) {
+				
+				ArrayList<MethodCallExpr> methodCalls = tcp.getMethodCalls(testCaseMethod, TestCaseParser.seleniumDomRelatedMethodCallList);
+
+				//for (MethodCallExpr mce : methodCalls)
+        		//	System.out.println(mce);
+
+		        // add a body to the method
+		        BlockStmt block = new BlockStmt();
+		        
+		        for (Statement stmt : testCaseMethod.getBody().getStmts()) {
+		        	System.out.println("stmt: " + stmt);
+	        		ASTHelper.addStmt(block, stmt);
+
+	        		for (MethodCallExpr mce : methodCalls) {
+
+	        			if (stmt.toString().contains(mce.toString())){
+	        				// add a statement do the method body
+	        				//Statement inject = JavaParser.parseStatement("com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getBy(By.id(\"login\"));");
+	        				System.out.println("mce.getName(): " + mce.getName());
+	        				System.out.println("mce.getArgs(): " + mce.getArgs());
+	        				Statement inject = JavaParser.parseStatement("i++;");
+	        				ASTHelper.addStmt(block, inject);
+	        			}
+	        		}
+		        }
+
+		        testCaseMethod.setBody(block);
+				
+			}
+			
+			if (writeBack == true){
+				String newFileLoc = System.getProperty("user.dir");
+				// On Linux/Mac
+				newFileLoc += "/src/main/java/casestudies/instrumentedtests/";
+				// On Windows
+				//newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
+				
+				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
+				cu.setPackage(new PackageDeclaration(new NameExpr("casestudies.instrumentedtests")));
+				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
+				
+				LOG.info("done writing");
+			}
+
+		} catch (FileNotFoundException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (ParseException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	}
+
+	
+	
+	public void instrument2(File file, boolean writeBack) {
+		try {
+			TestCaseParser tcp = new TestCaseParser();
+			CompilationUnit cu;
+			cu = TestCaseParser.getCompilationUnitOfFileName(file.getAbsolutePath());
+			
+			HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> methodCalls = tcp.getSeleniumDomRelateMethodCallExpressions(cu);
+			
+			for (MethodDeclaration e : methodCalls.keySet()) {
 				LOG.info("testcase: {}", e.getName());
 				System.out.println("testcase: " + e.getName());
-				for (MethodCallExpr mce : srmce.get(e)) {
+				
+				
+				for (MethodCallExpr mce : methodCalls.get(e)) {
 					this.instrumentMethodCall(mce);
 					System.out.println(mce);
 				}
@@ -87,14 +162,11 @@ public class SeleniumInstrumentor {
 				// On Windows
 				//newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
 
-				
-				
 				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
 				
 				cu.setPackage(new PackageDeclaration(new NameExpr("casestudies.instrumentedtests")));
 				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
 				//CompilationUnitUtils.writeCompilationUnitToFile(unitToInject, newFileLoc+file.getName(), true);
-				
 				
 				
 				LOG.info("done writing");
@@ -125,12 +197,13 @@ public class SeleniumInstrumentor {
 			codeToInstrument = "com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getInput";
 			break;
 		case "clear":
+			System.out.println("mce.getParentNode() is " + mce);
 			System.out.println("mce.getParentNode() is " + mce.getParentNode());
-
-			mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"clear\")).clear");
+						
+			//mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"clear\")).clear");
 			break;
 		case "click":
-			mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"click\")).click");
+			//mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"click\")).click");
 		}
 
 		if (codeToInstrument!=null){
