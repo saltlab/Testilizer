@@ -77,14 +77,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private EmbeddedBrowser browser = null;
 	CrawljaxConfiguration config = null;
-	
+
 	public TestSuiteExtension(File outputFolder) {
 		Preconditions
 		.checkNotNull(outputFolder, "Output folder cannot be null");
 		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
 	}
-	
+
 
 	/**
 	 * Instrumenting Selenium test suite to get the execution trace
@@ -123,7 +123,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					break; // instrument only one file...
 				}
 			}
-			
+
 			/**
 			 * (2) Compiling the instrumented Selenium unit test files
 			 */
@@ -162,7 +162,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}    
 
 			fileManager.close();
-			
+
 			// Not set on my Mac
 			if(success){
 				// Executing the instrumented unit test files. This will produce a log of the execution trace
@@ -178,7 +178,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					break; // just to instrument and run one testcase...
 				}
 			}
-			
+
 			SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteEnd");
 
 		} catch (IOException e) {
@@ -186,7 +186,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 	}
-	
+
 	public static void executeUnitTest(String test) {
 		try {
 			String fileName = "com.crawljax.plugins.testsuiteextension." + getFileFullName(test);
@@ -197,7 +197,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			e.printStackTrace();
 		}
 	}
-	
+
 	public static String getFileFullName(String file) {
 		file = file.replace(System.getProperty("user.dir"), "");
 		file = file.replace("/src/main/java/com/crawljax/plugins/testsuiteextension/", "");
@@ -208,7 +208,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		file = file.replace("\\", ".");
 		return file;
 	}
-	
+
 
 	/**
 	 * Executes happy paths only once after the index state was created.
@@ -222,70 +222,100 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		// Re-executing based on the execution log to generate initial paths for the SFG
 		LOG.info("Re-executing Selenium commands based on the execution log to generate initial paths for the SFG...");	
 
-
 		WebElement webElement = null;
 		Eventable event = null;
-		
-		System.out.println(SeleniumInstrumentor.readFromSeleniumExecutionTrace());
-		
-		// TODO: Reading from the log file...
-		String command = null;
-		while(!command.equals("TestSuiteEnd")){
-			if (command.equals("NewTestCase")){
-				// Reseting the crawler before each test case
-				firstConsumer.getCrawler().reset();
-			}
+
+		ArrayList<String> trace = SeleniumInstrumentor.readFromSeleniumExecutionTrace();
+
+		for (String st: trace){
 			// read the value such as id, cssSelector, xpath, and etc. 
-			String value = null;
-			switch (command){
-				case "By.id":
-					webElement = browser.getBrowser().findElement(By.id(value));
-					break;
-				case "By.name":
-					webElement = browser.getBrowser().findElement(By.name(value));
-					break;
-				case "By.xpath":
-					webElement = browser.getBrowser().findElement(By.xpath(value));
-					break;
-				case "By.tag":
-					webElement = browser.getBrowser().findElement(By.tagName(value));
-					break;
-				case "By.class":
-					webElement = browser.getBrowser().findElement(By.className(value));
-					break;
-				case "By.cssSelector":
-					webElement = browser.getBrowser().findElement(By.cssSelector(value));
-					break;
-				case "By.linkText":
-					webElement = browser.getBrowser().findElement(By.linkText(value));
-					break;
-				case "By.partiallinktext":
-					webElement = browser.getBrowser().findElement(By.partialLinkText(value));
-					break;
-				case "clear":
-					webElement.clear();
-					break;
-				case "sendKeys":
-					webElement.sendKeys(value);
-					break;
-				case "click":
-					webElement.sendKeys(value);
-					// generate corresponding Eventable for webElement
-					event = getCorrespondingEventable(webElement, EventType.click, browser);
-					webElement.click();
-					// inspecting DOM changes and adding to SFG
-					firstConsumer.getCrawler().inspectNewState(event);
-					break;
-				default:
-			}
+			ArrayList<String> methodValue = new ArrayList<String>();
 
 
+			if (st.equals("TestSuiteBegin"))
+				continue; // ignoring for now, may be considered in future
+
+			if (st.equals("TestSuiteEnd"))
+				break; // terminating the execution of happy paths
+
+			if (st.equals("NewTestCase"))
+				firstConsumer.getCrawler().reset();
+
+			else{
+				methodValue = getMethodValue(st);
+				System.out.println("method: " + methodValue.get(0));
+				if (methodValue.size()==2)
+					System.out.println(" value: " + methodValue.get(1));
+
+				switch (methodValue.get(0)){
+					case "By.id":
+						webElement = browser.getBrowser().findElement(By.id(methodValue.get(1)));
+						break;
+					case "By.name":
+						webElement = browser.getBrowser().findElement(By.name(methodValue.get(1)));
+						break;
+					case "By.xpath":
+						webElement = browser.getBrowser().findElement(By.xpath(methodValue.get(1)));
+						break;
+					case "By.tagName":
+						webElement = browser.getBrowser().findElement(By.tagName(methodValue.get(1)));
+						break;
+					case "By.className":
+						webElement = browser.getBrowser().findElement(By.className(methodValue.get(1)));
+						break;
+					case "By.selector":
+						webElement = browser.getBrowser().findElement(By.cssSelector(methodValue.get(1)));
+						break;
+					case "By.linkText":
+						webElement = browser.getBrowser().findElement(By.linkText(methodValue.get(1)));
+						break;
+					case "By.partialLinktext":
+						webElement = browser.getBrowser().findElement(By.partialLinkText(methodValue.get(1)));
+						break;
+					case "clear":
+						if (webElement!=null)
+							webElement.clear();
+						break;
+					case "sendKeys":
+						if (webElement!=null)
+							webElement.sendKeys(methodValue.get(1));
+						break;
+					case "click":
+						if (webElement!=null){
+							// generate corresponding Eventable for webElement
+							event = getCorrespondingEventable(webElement, EventType.click, browser);
+							webElement.click();
+							// inspecting DOM changes and adding to SFG
+							//firstConsumer.getCrawler().inspectNewState(event);
+						}
+						break;
+					default:
+				}
+			}			
 		}
 
-		
 		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
 	}
-	
+
+	// returning method with value
+	private ArrayList<String> getMethodValue(String s){
+		String[] byTypes = {"By.id", "By.name", "By.xpath", "By.tagName", "By.className", "By.selector", "By.linkText", "By.partialLinkText", 
+				"sendKeys", "clear", "click"};
+		ArrayList<String> methodValue = new ArrayList<String>();
+		String value = null;
+		for (int i=0; i<byTypes.length; i++){
+			if (s.contains(byTypes[i])){
+				value = s.replace(byTypes[i], "");
+				value = value.replace(": ", "");
+				methodValue.add(byTypes[i]);
+				break;
+			}
+		}
+		methodValue.add(value);
+		return methodValue;
+	}
+
+
 	private Eventable getCorrespondingEventable(WebElement webElement, EventType eventType, EmbeddedBrowser browser) {
 		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, browser);
 		Eventable event = new Eventable(candidateElement, eventType);
@@ -295,7 +325,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private CandidateElement getCorrespondingCandidateElement(WebElement webElement, EmbeddedBrowser browser) {
 		Document dom;
-		
+
 		try {
 			dom = DomUtils.asDocument(browser.getStrippedDomWithoutIframeContent());
 
@@ -303,7 +333,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				// checking all tags defined in the crawlRules
 				NodeList nodeList = dom.getElementsByTagName(crawlTag.getTagName());
 
-				String xpath1 = getXPath(webElement);
+				//String xpath1 = getXPath(webElement);
 				String xpath2 = null;
 				org.w3c.dom.Element sourceElement = null;
 
@@ -329,7 +359,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 	private boolean checkEqulity(WebElement webElement,	org.w3c.dom.Element sourceElement) {
-		
+
 		//get xpath of the WebElement
 		String xpath1 = getXPath(webElement);
 
@@ -348,7 +378,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			System.out.println("xpaths are equal");
 			return true;
 		}
-		
+
 		System.out.println("xpaths are not equal");
 		return false;
 	}
@@ -381,9 +411,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		String xpath = (String) browser.executeJavaScriptWithParam(jscript, element);
 		return xpath;
 	} 
-	
-	
-	
+
+
+
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 	}
@@ -409,7 +439,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
 		LOG.debug("postCrawling");
 		StateFlowGraph sfg = session.getStateFlowGraph();
-		
+
 		// Writing event-function relation table, SFG, and jsFunctions to corresponding files
 		FileOutputStream fos = null;
 		ObjectOutputStream out = null;
@@ -438,13 +468,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 		sfg2 = null;
-		
+
 		//LOG.info(Serializer.toPrettyJson(sfg));
 
 		if (Serializer.toPrettyJson(sfg).equals(Serializer.toPrettyJson(sfg2)))
 			LOG.info("ERROR!");
 		 */
-		
+
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
 

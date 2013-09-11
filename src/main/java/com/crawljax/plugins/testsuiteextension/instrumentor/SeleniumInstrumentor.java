@@ -38,6 +38,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.openqa.selenium.By;
 import org.slf4j.Logger;
@@ -66,14 +68,16 @@ public class SeleniumInstrumentor {
 
 	/**
 	 * The pattern to be saved in the log file is as following:
-	 * "TestSuiteBegin"
-	 * "NewTestCase"
-	 * By.id("login")
-	 * clear, senkeys, ....
-	 * ...
-	 * "NewTestCase"
 	 * 
-	 * "TestSuiteEnd"
+	 * TestSuiteBegin
+	 * NewTestCase
+	 * By.id: login
+	 * sendKeys: ...
+	 * click
+	 * ...
+	 * NewTestCase
+	 * ...
+	 * TestSuiteEnd
 	 */					
 	public void instrument(File file, boolean writeBack) {
 		try {
@@ -123,6 +127,20 @@ public class SeleniumInstrumentor {
 
 			}
 
+			
+			HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> methodCalls = tcp.getSeleniumDomRelateMethodCallExpressions(cu);
+
+			for (MethodDeclaration e : methodCalls.keySet()) {
+				LOG.info("testcase: {}", e.getName());
+				System.out.println("testcase: " + e.getName());
+
+				for (MethodCallExpr mce : methodCalls.get(e)) {
+					this.instrumentMethodCall(mce);
+					System.out.println(mce);
+				}
+			}
+
+			
 			if (writeBack == true){
 				String newFileLoc = System.getProperty("user.dir");
 				// On Linux/Mac
@@ -205,21 +223,14 @@ public class SeleniumInstrumentor {
 		// create a methodcall expre
 		String codeToInstrument = null;
 		String methodCallName = mce.getName();
+		// logging the values
 		switch(mce.getName()){
 		case "findElement":
-			codeToInstrument = "com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getBy";
+			codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getBy";
 			break;
 		case "sendKeys":
-			codeToInstrument = "com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getInput";
+			codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getInput";
 			break;
-		case "clear":
-			System.out.println("mce.getParentNode() is " + mce);
-			System.out.println("mce.getParentNode() is " + mce.getParentNode());
-
-			//mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"clear\")).clear");
-			break;
-		case "click":
-			//mce.setName("findElement(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.getNextMethod(com.crawljax.plugins.instrumentor.SeleniumInstrumentor.lastUsedBy, \"click\")).click");
 		}
 
 		if (codeToInstrument!=null){
@@ -280,10 +291,19 @@ public class SeleniumInstrumentor {
 	}
 
 
-	public static void parseStatement(String string) {
-		//TODO: add the code analysis here
-		writeToSeleniumExecutionTrace(string);	
+	public static void parseStatement(String statement) {
+		// writing commands and values in separated to the seleniumExecutionTrace file
+		String action = null;
+		if (statement.contains(".clear()"))
+			action = "clear";
+		else if (statement.contains(".click()"))
+			action = "click";
+		
+		if (action!=null)
+			writeToSeleniumExecutionTrace(action);
 	}
+
+	
 
 	public static void writeToSeleniumExecutionTrace(String string) {
 		try {
