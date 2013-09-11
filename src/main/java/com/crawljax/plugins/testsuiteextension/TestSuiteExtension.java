@@ -93,6 +93,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("TestSuiteExtension plugin started");
 
+		if (true)
+			return;
+		
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
 
 		try {
@@ -286,7 +289,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							event = getCorrespondingEventable(webElement, EventType.click, browser);
 							webElement.click();
 							// inspecting DOM changes and adding to SFG
-							//firstConsumer.getCrawler().inspectNewState(event);
+							firstConsumer.getCrawler().inspectNewState(event);
 						}
 						break;
 					default:
