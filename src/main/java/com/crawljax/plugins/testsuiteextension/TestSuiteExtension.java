@@ -93,9 +93,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("TestSuiteExtension plugin started");
 
-		if (true)
-			return;
-		
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
 
 		try {
@@ -298,7 +295,33 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
+		
+		CrawlSession session = firstConsumer.getContext().getSession();
+		saveSFG(session);
+		
 	}
+
+	private void saveSFG(CrawlSession session) {
+		LOG.info("Saving the SFG based on executed Selenium test cases...");
+		StateFlowGraph sfg = session.getStateFlowGraph();
+
+		FileOutputStream fos = null;
+		ObjectOutputStream out = null;
+
+		// Save the SFG to file
+		String sfgFileName = "sfg.ser";
+		try {
+			fos = new FileOutputStream(sfgFileName);
+			out = new ObjectOutputStream(fos);
+			out.writeObject(sfg);
+			out.close();
+			LOG.info("TestSuiteExtension successfully wrote SFG to sfg.ser file");
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		
+	}
+
 
 	// returning method with value
 	private ArrayList<String> getMethodValue(String s){
@@ -317,7 +340,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		methodValue.add(value);
 		return methodValue;
 	}
-
 
 	private Eventable getCorrespondingEventable(WebElement webElement, EventType eventType, EmbeddedBrowser browser) {
 		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, browser);
