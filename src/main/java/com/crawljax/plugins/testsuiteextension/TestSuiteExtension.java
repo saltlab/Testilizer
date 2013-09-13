@@ -10,10 +10,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -22,10 +18,8 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 
-import org.apache.commons.lang3.SerializationUtils;
 import org.junit.runner.JUnitCore;
 import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,11 +52,8 @@ import com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.util.DomUtils;
 import com.crawljax.util.XPathHelper;
-import com.fasterxml.jackson.databind.deser.Deserializers;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
 
 /**
  * TestSuiteExtension is Crawljax plugin tool which extends a current Selenium test suite of an Ajax application. 
@@ -73,14 +64,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
-	//private StateFlowGraph oldSFG = null;
-
 	private EmbeddedBrowser browser = null;
 	CrawljaxConfiguration config = null;
 
-	public TestSuiteExtension(File outputFolder) {
-		Preconditions
-		.checkNotNull(outputFolder, "Output folder cannot be null");
+	public TestSuiteExtension() {
 		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
 	}
@@ -319,7 +306,26 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
-		
+
+		// Read the SFG from file for testing
+		/*StateFlowGraph sfg2 = null;
+		try {
+			fis = new FileInputStream(sfgFileName);
+			in = new ObjectInputStream(fis);
+			sfg2 = (StateFlowGraph) in.readObject();
+			in.close();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+		sfg2 = null;
+
+		//LOG.info(Serializer.toPrettyJson(sfg));
+
+		if (Serializer.toPrettyJson(sfg).equals(Serializer.toPrettyJson(sfg2)))
+			LOG.info("ERROR!");
+		 */
+
 	}
 
 
@@ -350,7 +356,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private CandidateElement getCorrespondingCandidateElement(WebElement webElement, EmbeddedBrowser browser) {
 		Document dom;
-
 		try {
 			dom = DomUtils.asDocument(browser.getStrippedDomWithoutIframeContent());
 
@@ -384,7 +389,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 	private boolean checkEqulity(WebElement webElement,	org.w3c.dom.Element sourceElement) {
-
 		//get xpath of the WebElement
 		String xpath1 = getXPath(webElement);
 
@@ -409,7 +413,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 	public String getXPath(WebElement element) {
-
 		String jscript = "function getElementXPath(elt) " +   
 				"{" + 
 				"var path = \"\";" +
@@ -438,7 +441,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	} 
 
 
-
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 	}
@@ -453,53 +455,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.debug("preStateCrawling");
 		LOG.info("Prestate found new state {} with {} candidates",
 				state.getName(), candidateElements.size());
-
 	}
 
 
-	/**
-	 * Generates the report.
-	 */
 	@Override
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
-		LOG.debug("postCrawling");
-		StateFlowGraph sfg = session.getStateFlowGraph();
-
-		// Writing event-function relation table, SFG, and jsFunctions to corresponding files
-		FileOutputStream fos = null;
-		ObjectOutputStream out = null;
-
-		// Save the SFG to file
-		String sfgFileName = "sfg.ser";
-		try {
-			fos = new FileOutputStream(sfgFileName);
-			out = new ObjectOutputStream(fos);
-			out.writeObject(sfg);
-			out.close();
-			LOG.info("TestSuiteExtension successfully wrote SFG to sfg.ser file");
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-
-		// Read the SFG from file for testing
-		/*StateFlowGraph sfg2 = null;
-		try {
-			fis = new FileInputStream(sfgFileName);
-			in = new ObjectInputStream(fis);
-			sfg2 = (StateFlowGraph) in.readObject();
-			in.close();
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		}
-
-		sfg2 = null;
-
-		//LOG.info(Serializer.toPrettyJson(sfg));
-
-		if (Serializer.toPrettyJson(sfg).equals(Serializer.toPrettyJson(sfg2)))
-			LOG.info("ERROR!");
-		 */
-
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
 
@@ -523,7 +483,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		ArrayList<String> executedJSFunctions = new ArrayList<String>();
 		executedJSFunctions.clear();
 
-		// TODO: calculate code coverage
+		// TODO: calculate code coverage for feedback-directed exploration
 		/*for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
 			try{
 				Object executedFunctions =  context.getBrowser().executeJavaScript("return " + modifiedJS + "_executed_functions;");
@@ -537,9 +497,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				LOG.info("Could not execute script: " + "return " + modifiedJS + "_executed_functions;");
 			}
 		}*/
-
+		
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
-
 	}
 
 

@@ -274,22 +274,6 @@ public class SeleniumInstrumentor {
 	}	
 
 
-	public static By getNextMethod(By by, String method) {
-		try {
-			FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
-			fw.write(method + "\n");
-			System.out.println("by is" + by.toString());
-			System.out.println(method);
-
-			fw.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-
-		return by;
-	}
-
 
 	public static void parseStatement(String statement) {
 		// writing commands and values in separated to the seleniumExecutionTrace file
