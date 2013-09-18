@@ -4,6 +4,7 @@ import japa.parser.ASTHelper;
 import japa.parser.JavaParser;
 import japa.parser.ParseException;
 import japa.parser.ast.CompilationUnit;
+import japa.parser.ast.Node;
 import japa.parser.ast.PackageDeclaration;
 import japa.parser.ast.body.ClassOrInterfaceDeclaration;
 import japa.parser.ast.body.MethodDeclaration;
@@ -42,6 +43,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +67,7 @@ public class SeleniumInstrumentor {
 		instrument(file, true);
 	}
 
-
+	
 	/**
 	 * The pattern to be saved in the log file is as following:
 	 * 
@@ -102,9 +104,19 @@ public class SeleniumInstrumentor {
 
 				for (Statement stmt : testCaseMethod.getBody().getStmts()) {
 					System.out.println("stmt: " + stmt);
-					ASTHelper.addStmt(block, stmt);
+
+					// no instrumentation needed if there is no method calls
+					boolean hasMethodCall = false;
+					for (MethodCallExpr mce : methodCalls) {
+						if (stmt.toString().contains(mce.toString()))
+							hasMethodCall = true;
+					}
+					// do not change non method calls statements
+					if (hasMethodCall == false)
+						ASTHelper.addStmt(block, stmt);
 
 					for (MethodCallExpr mce : methodCalls) {
+						
 						if (stmt.toString().contains(mce.toString())){
 							// add a statement do the method body
 							String s = stmt.toString();
@@ -112,13 +124,34 @@ public class SeleniumInstrumentor {
 							s = s.replace(";", "");
 							s = s.replace("\\", "\\\\");
 							s = s.replace("\"", "\\\"");
-							Statement inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.parseStatement(\""+ s +"\");");
+							
+							Statement inject = null;
+
+							if (mce.getName().equals("clear") || mce.getName().equals("click")){
+								// instrument with a new code
+								
+								Expression scope = mce.getScope();
+								//System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +");");
+								//inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +");");
+
+								System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +")." + mce.getName() + "();");
+								inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +")." + mce.getName() + "();");							
+							}else{
+								// otherwise also add the original statements
+								ASTHelper.addStmt(block, stmt);
+							}
+							
+							//inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.parseStatement();");
+							
+							//Statement inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.parseStatement(\""+ s +"\");");
+							
 							//System.out.println("mce.getName(): " + mce.getName());
 							//System.out.println("mce.getArgs(): " + mce.getArgs());
-							//Statement inject = JavaParser.parseStatement("i++;");
-							ASTHelper.addStmt(block, inject);
+							
+							if (inject!=null)
+								ASTHelper.addStmt(block, inject);
 
-							break; // consider only one mce
+							break; // TODO: remove this as it considers only one mce at this point...
 						}
 					}
 				}
@@ -231,6 +264,11 @@ public class SeleniumInstrumentor {
 		case "sendKeys":
 			codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getInput";
 			break;
+		case "clear":
+			System.out.println("CLEAR:");
+			break;
+
+		
 		}
 
 		if (codeToInstrument!=null){
@@ -287,7 +325,11 @@ public class SeleniumInstrumentor {
 			writeToSeleniumExecutionTrace(action);
 	}
 
-	
+	public static WebElement getWebElement(WebElement webElement) {
+		System.out.println("getWebElement: " + webElement);
+		writeToSeleniumExecutionTrace(webElement.toString());
+		return webElement;
+	}	
 
 	public static void writeToSeleniumExecutionTrace(String string) {
 		try {

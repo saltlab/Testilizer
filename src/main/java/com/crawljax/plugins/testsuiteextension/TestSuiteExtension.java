@@ -110,6 +110,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					break; // instrument only one file...
 				}
 			}
+			
+			
+			if (true)
+				return;
 
 			/**
 			 * (2) Compiling the instrumented Selenium unit test files
