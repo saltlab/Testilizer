@@ -50,7 +50,6 @@ import org.slf4j.LoggerFactory;
 import com.crawljax.plugins.utils.CompilationUnitUtils;
 
 
-
 public class SeleniumInstrumentor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(SeleniumInstrumentor.class);
@@ -105,59 +104,37 @@ public class SeleniumInstrumentor {
 				for (Statement stmt : testCaseMethod.getBody().getStmts()) {
 					System.out.println("stmt: " + stmt);
 
-					// no instrumentation needed if there is no method calls
-					boolean hasMethodCall = false;
-					for (MethodCallExpr mce : methodCalls) {
-						if (stmt.toString().contains(mce.toString()))
-							hasMethodCall = true;
+					// do not change non-dom related method calls statements
+					boolean stmtHasMethodCall = false;
+					for (String methodCall : TestCaseParser.seleniumDomRelatedMethodCallList) {
+						if (stmt.toString().contains(methodCall))
+							stmtHasMethodCall = true;
 					}
-					// do not change non method calls statements
-					if (hasMethodCall == false)
+					if (stmtHasMethodCall == false)
 						ASTHelper.addStmt(block, stmt);
 
 					for (MethodCallExpr mce : methodCalls) {
-						
 						if (stmt.toString().contains(mce.toString())){
-							// add a statement do the method body
-							String s = stmt.toString();
-							s = s.replaceAll("[\n\r]", "");
-							s = s.replace(";", "");
-							s = s.replace("\\", "\\\\");
-							s = s.replace("\"", "\\\"");
-							
 							Statement inject = null;
-
-							if (mce.getName().equals("clear") || mce.getName().equals("click")){
+							if (mce.getName().equals("clear") || mce.getName().equals("click") || mce.getName().equals("sendKeys")){
 								// instrument with a new code
-								
+								List<Expression> args = mce.getArgs();
 								Expression scope = mce.getScope();
-								//System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +");");
-								//inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +");");
-
-								System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +")." + mce.getName() + "();");
-								inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +")." + mce.getName() + "();");							
-							}else{
-								// otherwise also add the original statements
-								ASTHelper.addStmt(block, stmt);
+								if (args==null){
+									System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", \"\")." + mce.getName() + "();");
+									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", \"\")." + mce.getName() + "();");
+								}else{
+									System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
+									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
+								}
 							}
-							
-							//inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.parseStatement();");
-							
-							//Statement inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.parseStatement(\""+ s +"\");");
-							
-							//System.out.println("mce.getName(): " + mce.getName());
-							//System.out.println("mce.getArgs(): " + mce.getArgs());
 							
 							if (inject!=null)
 								ASTHelper.addStmt(block, inject);
-
-							break; // TODO: remove this as it considers only one mce at this point...
 						}
 					}
 				}
-
 				testCaseMethod.setBody(block);
-
 			}
 
 			
@@ -168,19 +145,22 @@ public class SeleniumInstrumentor {
 				System.out.println("testcase: " + e.getName());
 
 				for (MethodCallExpr mce : methodCalls.get(e)) {
-					this.instrumentMethodCall(mce);
+					//this.instrumentMethodCall(mce);
 					System.out.println(mce);
 				}
 			}
 
 			
+			
+			// TODO: Instrument assertions...
+			
+		
 			if (writeBack == true){
 				String newFileLoc = System.getProperty("user.dir");
 				// On Linux/Mac
 				newFileLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/instrumentedtests/";
 				// On Windows
 				//newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
-
 				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
 				cu.setPackage(new PackageDeclaration(new NameExpr("com.crawljax.plugins.testsuiteextension.casestudies.instrumentedtests")));
 				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
@@ -201,55 +181,15 @@ public class SeleniumInstrumentor {
 	}
 
 
-
-	public void instrument2(File file, boolean writeBack) {
-		try {
-			TestCaseParser tcp = new TestCaseParser();
-			CompilationUnit cu;
-			cu = TestCaseParser.getCompilationUnitOfFileName(file.getAbsolutePath());
-
-			HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> methodCalls = tcp.getSeleniumDomRelateMethodCallExpressions(cu);
-
-			for (MethodDeclaration e : methodCalls.keySet()) {
-				LOG.info("testcase: {}", e.getName());
-				System.out.println("testcase: " + e.getName());
-
-
-				for (MethodCallExpr mce : methodCalls.get(e)) {
-					this.instrumentMethodCall(mce);
-					System.out.println(mce);
-				}
-			}
-
-			if (writeBack == true){
-
-				String newFileLoc = System.getProperty("user.dir");
-				// On Linux/Mac
-				newFileLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/instrumentedtests/";
-				// On Windows
-				//newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
-
-				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
-
-				cu.setPackage(new PackageDeclaration(new NameExpr("com.crawljax.plugins.testsuiteextension.casestudies.instrumentedtests")));
-				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
-				//CompilationUnitUtils.writeCompilationUnitToFile(unitToInject, newFileLoc+file.getName(), true);
-
-
-				LOG.info("done writing");
-			}
-
-		} catch (FileNotFoundException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} catch (ParseException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
+	private String makeInstrumentableString(String args) {
+		String result = args;
+		result = result.replaceAll("[\n\r]", "");
+		result = result.replace(";", "");
+		result = result.replace("\\", "\\\\");
+		result = result.replace("\"", "\\\"");
+		return result;
 	}
+
 
 	public MethodCallExpr instrumentMethodCall(MethodCallExpr mce) {
 		List<Expression> oldArgs = mce.getArgs();
@@ -325,9 +265,10 @@ public class SeleniumInstrumentor {
 			writeToSeleniumExecutionTrace(action);
 	}
 
-	public static WebElement getWebElement(WebElement webElement) {
-		System.out.println("getWebElement: " + webElement);
+	public static WebElement getWebElement(WebElement webElement, String method, String args) {
+		System.out.println("Performing " + method + " on: " + webElement);
 		writeToSeleniumExecutionTrace(webElement.toString());
+		writeToSeleniumExecutionTrace(method + " " + args);
 		return webElement;
 	}	
 
