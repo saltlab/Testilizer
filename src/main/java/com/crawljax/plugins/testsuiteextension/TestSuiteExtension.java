@@ -10,6 +10,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -80,6 +81,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("TestSuiteExtension plugin started");
 
+		if(true)
+			return;
+		
+		
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
 
 		try {
@@ -112,8 +117,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}
 			
 			
-			if (true)
-				return;
+			//if (true)
+			//	return;
 
 			/**
 			 * (2) Compiling the instrumented Selenium unit test files
@@ -236,31 +241,31 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				methodValue = getMethodValue(st);
 				System.out.println("method: " + methodValue.get(0));
 				if (methodValue.size()==2)
-					System.out.println(" value: " + methodValue.get(1));
-
+					System.out.println("value: " + methodValue.get(1));
+				
 				switch (methodValue.get(0)){
-					case "By.id":
+					case "id:":
 						webElement = browser.getBrowser().findElement(By.id(methodValue.get(1)));
 						break;
-					case "By.name":
+					case "name:":
 						webElement = browser.getBrowser().findElement(By.name(methodValue.get(1)));
 						break;
-					case "By.xpath":
+					case "xpath:":
 						webElement = browser.getBrowser().findElement(By.xpath(methodValue.get(1)));
 						break;
-					case "By.tagName":
+					case "tag name:":
 						webElement = browser.getBrowser().findElement(By.tagName(methodValue.get(1)));
 						break;
-					case "By.className":
+					case "class name:":
 						webElement = browser.getBrowser().findElement(By.className(methodValue.get(1)));
 						break;
-					case "By.selector":
+					case "css selector:":
 						webElement = browser.getBrowser().findElement(By.cssSelector(methodValue.get(1)));
 						break;
-					case "By.linkText":
+					case "link text:":
 						webElement = browser.getBrowser().findElement(By.linkText(methodValue.get(1)));
 						break;
-					case "By.partialLinktext":
+					case "partial link text:":
 						webElement = browser.getBrowser().findElement(By.partialLinkText(methodValue.get(1)));
 						break;
 					case "clear":
@@ -333,24 +338,50 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	// returning method with value
+
+	// TODO: This method should be rafactored later
+	/**
+	 * Returning method with value
+	 * Transforming [[FirefoxDriver: firefox on XP (4fd65769-108b-450b-8511-298d1bf67632)] -> css selector: button[type="submit"]]
+	 * to <"css selector:", "button[type="submit"]">
+	 */
 	private ArrayList<String> getMethodValue(String s){
-		String[] byTypes = {"By.id", "By.name", "By.xpath", "By.tagName", "By.className", "By.selector", "By.linkText", "By.partialLinkText", 
-				"sendKeys", "clear", "click"};
+		String[] withParameter = {"id:", "name:", "xpath:", "tag name:", "class name:", "css selector:", "link text:", "partial link text:", 
+				"sendKeys"};
+
+		String[] withoutParameter = {"clear", "click"}; 
+		
 		ArrayList<String> methodValue = new ArrayList<String>();
 		String value = null;
-		for (int i=0; i<byTypes.length; i++){
-			if (s.contains(byTypes[i])){
-				value = s.replace(byTypes[i], "");
-				value = value.replace(": ", "");
-				methodValue.add(byTypes[i]);
+		int startIndexOfValue, endIndexOfValue = 0;
+		for (int i=0; i<withParameter.length; i++){
+			if (s.contains(withParameter[i])){
+				startIndexOfValue = s.indexOf(withParameter[i]) + withParameter[i].length() + 1;
+				if (withParameter[i].equals("sendKeys"))
+					endIndexOfValue = s.length();
+				else
+					endIndexOfValue = s.length()-1;
+
+				value = s.substring(startIndexOfValue, endIndexOfValue);
+				methodValue.add(withParameter[i]);
 				break;
 			}
 		}
+
+		for (int i=0; i<withoutParameter.length; i++){
+			if (s.contains(withoutParameter[i])){
+				value = "";
+				methodValue.add(withoutParameter[i]);
+				break;
+			}
+		}
+		
 		methodValue.add(value);
 		return methodValue;
 	}
 
+
+	
 	private Eventable getCorrespondingEventable(WebElement webElement, EventType eventType, EmbeddedBrowser browser) {
 		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, browser);
 		Eventable event = new Eventable(candidateElement, eventType);
