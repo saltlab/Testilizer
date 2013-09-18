@@ -82,7 +82,6 @@ public class SeleniumInstrumentor {
 	 */					
 	public void instrument(File file, boolean writeBack) {
 		try {
-			writeToSeleniumExecutionTrace("NewTestCase");
 
 			TestCaseParser tcp = new TestCaseParser();
 			CompilationUnit cu;

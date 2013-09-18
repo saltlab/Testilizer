@@ -81,6 +81,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("TestSuiteExtension plugin started");
 
+		// just to bypass instrumenting and ggetting exec trace
 		if(true)
 			return;
 		
@@ -106,19 +107,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				}
 			});
 
-			SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteBegin");
 
 			for (File file : listOfOriginalFiles) {
 				if (file.isFile()) {
 					LOG.info("file.getName(): {}", file.getName());
 					SI.instrument(file);
-					break; // instrument only one file...
+					//break; // instrument only one file...
 				}
 			}
 			
-			
-			//if (true)
-			//	return;
 
 			/**
 			 * (2) Compiling the instrumented Selenium unit test files
@@ -163,15 +160,20 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			if(success){
 				// Executing the instrumented unit test files. This will produce a log of the execution trace
 				LOG.info("Instrumenting unit test files and logging the execution trace...");
+
+				SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteBegin");
+
 				for (File file : listOfInstrumentedFiles) {
 					if (file.isFile()) {
 						System.out.println("Executing unit test: " + file.getName());
 						System.out.println("Executing unit test in " + file.getAbsolutePath());
 						LOG.info("Executing unit test in {}", file.getName());
 
+						SeleniumInstrumentor.writeToSeleniumExecutionTrace("NewTestCase");
+
 						executeUnitTest(file.getAbsolutePath());
 					}
-					break; // just to instrument and run one testcase...
+					//break; // just to instrument and run one testcase...
 				}
 			}
 
