@@ -11,6 +11,7 @@ import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -39,7 +40,9 @@ import com.crawljax.core.configuration.CrawljaxConfiguration;
 import com.crawljax.core.plugin.ExecuteInitialPathsPlugin;
 import com.crawljax.core.plugin.OnFireEventSucceededPlugin;
 import com.crawljax.core.plugin.OnNewStatePlugin;
+import com.crawljax.core.plugin.OnRevisitStatePlugin;
 import com.crawljax.core.plugin.OnUrlLoadPlugin;
+import com.crawljax.core.plugin.Plugin;
 import com.crawljax.core.plugin.PostCrawlingPlugin;
 import com.crawljax.core.plugin.PreCrawlingPlugin;
 import com.crawljax.core.plugin.PreStateCrawlingPlugin;
@@ -48,6 +51,8 @@ import com.crawljax.core.state.Identification;
 import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.Eventable.EventType;
+import com.crawljax.core.state.Identification.How;
+import com.crawljax.forms.FormInput;
 import com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
@@ -61,8 +66,8 @@ import com.google.common.collect.ImmutableList;
  * It initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.
  **/
 public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
-PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin{
-
+PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, OnRevisitStatePlugin{
+	
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
 	private EmbeddedBrowser browser = null;
@@ -81,7 +86,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("TestSuiteExtension plugin started");
 
-		// just to bypass instrumenting and ggetting exec trace
+		// Bypassing instrumenting and getting exec trace if already done
 		if(true)
 			return;
 		
@@ -225,6 +230,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		ArrayList<String> trace = SeleniumInstrumentor.readFromSeleniumExecutionTrace();
 
+		CopyOnWriteArrayList<FormInput> relatedFormInputs = new CopyOnWriteArrayList<FormInput>();
+
+		How how = null;
+		String howValue = null;
+
 		for (String st: trace){
 			// read the value such as id, cssSelector, xpath, and etc. 
 			ArrayList<String> methodValue = new ArrayList<String>();
@@ -244,47 +254,98 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				System.out.println("method: " + methodValue.get(0));
 				if (methodValue.size()==2)
 					System.out.println("value: " + methodValue.get(1));
-				
+								
 				switch (methodValue.get(0)){
 					case "id:":
-						webElement = browser.getBrowser().findElement(By.id(methodValue.get(1)));
+						how = Identification.How.id;
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.id(howValue));
 						break;
 					case "name:":
-						webElement = browser.getBrowser().findElement(By.name(methodValue.get(1)));
+						how = Identification.How.name;
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.name(howValue));
 						break;
 					case "xpath:":
-						webElement = browser.getBrowser().findElement(By.xpath(methodValue.get(1)));
+						how = Identification.How.xpath;
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.xpath(howValue));
 						break;
 					case "tag name:":
-						webElement = browser.getBrowser().findElement(By.tagName(methodValue.get(1)));
+						how = Identification.How.tag;
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.tagName(howValue));
 						break;
 					case "class name:":
-						webElement = browser.getBrowser().findElement(By.className(methodValue.get(1)));
+						how = Identification.How.name;
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.className(howValue));
 						break;
 					case "css selector:":
-						webElement = browser.getBrowser().findElement(By.cssSelector(methodValue.get(1)));
+						how = Identification.How.cssSelector;
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.cssSelector(howValue));
 						break;
 					case "link text:":
-						webElement = browser.getBrowser().findElement(By.linkText(methodValue.get(1)));
+						how = Identification.How.text;
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.linkText(howValue));
 						break;
 					case "partial link text:":
-						webElement = browser.getBrowser().findElement(By.partialLinkText(methodValue.get(1)));
+						how = Identification.How.partialText;
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.partialLinkText(howValue));
 						break;
 					case "clear":
-						if (webElement!=null)
-							webElement.clear();
+						// changed to do nothing. clear() would be called later when filling the form 
+						//if (webElement!=null)
+							//webElement.clear();
 						break;
 					case "sendKeys":
-						if (webElement!=null)
-							webElement.sendKeys(methodValue.get(1));
+						// storing input values for an element to be clicked later
+						String inputValue = methodValue.get(1);
+
+						System.out.println("inputValue is: " + inputValue + " for " + how);
+
+						// setting form input values for the Eventable
+						System.out.println("adding " + inputValue + " to inputs");
+						relatedFormInputs.add(new FormInput(webElement.getTagName() , new Identification(how, howValue), inputValue));
+						System.out.println("relatedFormInputs: " + relatedFormInputs);
+
+						//if (webElement!=null)
+						//webElement.sendKeys(methodValue.get(1));
 						break;
 					case "click":
 						if (webElement!=null){
 							// generate corresponding Eventable for webElement
 							event = getCorrespondingEventable(webElement, EventType.click, browser);
-							webElement.click();
-							// inspecting DOM changes and adding to SFG
-							firstConsumer.getCrawler().inspectNewState(event);
+							
+							System.out.println("setting form inputs with: " + relatedFormInputs);
+							
+							event.setRelatedFormInputs(relatedFormInputs);
+
+							CopyOnWriteArrayList<FormInput> formInputsToCheck = event.getRelatedFormInputs();
+
+							System.out.println("formInputsToCheck: " + formInputsToCheck);							
+
+							firstConsumer.getCrawler().handleInputElements(event);
+							firstConsumer.getCrawler().waitForRefreshTagIfAny(event);
+
+							boolean fired = firstConsumer.getCrawler().fireEvent(event);
+
+							if (fired)
+								// inspecting DOM changes and adding to SFG
+								firstConsumer.getCrawler().inspectNewState(event);
+							else
+								LOG.info("webElement {} not clicked because not all crawl conditions where satisfied",	webElement);
+
+
+
+							// Applying the click with the form input values
+							//webElement.click();
+
+							// clearing the relatedFormInputs and inputValues to be set for the next click
+							//relatedFormInputs.clear();
 						}
 						break;
 					default:
@@ -476,12 +537,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		String xpath = (String) browser.executeJavaScriptWithParam(jscript, element);
 		return xpath;
 	} 
-
-
-	@Override
-	public void onNewState(CrawlerContext context, StateVertex vertex) {
-	}
-
+	
+	
+	
 	/**
 	 * Logs all the candidate elements so that the plugin knows which elements were the candidate
 	 * elements.
@@ -536,6 +594,22 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}*/
 		
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
+	}
+
+	
+	/**
+	 * Checking assertions on happy paths from existing test suite on new paths
+	 * Currently dealing with assertions that are DOM related. We do not consider 
+	 * those using variables in test cases for simplicity at this step.
+	 */
+	@Override
+	public void onNewState(CrawlerContext context, StateVertex vertex) {
+		// TODO: check the assertions from test suite
+	}
+
+	@Override
+	public void onRevisitState(CrawlerContext context, StateVertex currentState) {
+		// TODO: check the assertions from test suite
 	}
 
 
