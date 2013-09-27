@@ -218,7 +218,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	@Override
 	public void initialPathExecution(CrawljaxConfiguration conf, CrawlTaskConsumer firstConsumer) {
-
+		if (true)
+			return;
+		
 		browser = firstConsumer.getContext().getBrowser();
 		config = conf;
 
@@ -305,12 +307,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						// storing input values for an element to be clicked later
 						String inputValue = methodValue.get(1);
 
-						System.out.println("inputValue is: " + inputValue + " for " + how);
-
 						// setting form input values for the Eventable
-						System.out.println("adding " + inputValue + " to inputs");
+						//System.out.println("adding " + inputValue + " to inputs");
 						relatedFormInputs.add(new FormInput(webElement.getTagName() , new Identification(how, howValue), inputValue));
-						System.out.println("relatedFormInputs: " + relatedFormInputs);
+						//System.out.println("relatedFormInputs: " + relatedFormInputs);
 
 						//if (webElement!=null)
 						//webElement.sendKeys(methodValue.get(1));
@@ -320,7 +320,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// generate corresponding Eventable for webElement
 							event = getCorrespondingEventable(webElement, EventType.click, browser);
 							
-							System.out.println("setting form inputs with: " + relatedFormInputs);
+							//System.out.println("setting form inputs with: " + relatedFormInputs);
 							
 							event.setRelatedFormInputs(relatedFormInputs);
 
