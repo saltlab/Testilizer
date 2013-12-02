@@ -72,7 +72,9 @@ public class SeleniumInstrumentor {
 	 * 
 	 * TestSuiteBegin
 	 * NewTestCase
-	 * By.id: login
+	 * [[FirefoxDriver: firefox on XP (9e7dd94c-ec0b-4651-8d44-59c67f4f6847)] -> id: login]
+	 * clear 
+	 * [[FirefoxDriver: firefox on XP (9e7dd94c-ec0b-4651-8d44-59c67f4f6847)] -> id: login]
 	 * sendKeys: ...
 	 * click
 	 * ...

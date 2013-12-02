@@ -72,7 +72,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private EmbeddedBrowser browser = null;
 	CrawljaxConfiguration config = null;
-
+	
+	private ArrayList<AssertedElementPattern> assertedElementPatterns = new ArrayList<AssertedElementPattern>();
+	//private ArrayList<AssertedElementPattern> assertedElementPatterns = new ArrayList<AssertedElementPattern>();
+	
+	
 	public TestSuiteExtension() {
 		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
@@ -218,8 +222,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	@Override
 	public void initialPathExecution(CrawljaxConfiguration conf, CrawlTaskConsumer firstConsumer) {
-		if (true)
-			return;
+		//if (true)
+		//	return;
 		
 		browser = firstConsumer.getContext().getBrowser();
 		config = conf;
@@ -333,9 +337,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 							boolean fired = firstConsumer.getCrawler().fireEvent(event);
 
-							if (fired)
+							if (fired){
 								// inspecting DOM changes and adding to SFG
 								firstConsumer.getCrawler().inspectNewState(event);
+							}
 							else
 								LOG.info("webElement {} not clicked because not all crawl conditions where satisfied",	webElement);
 
@@ -347,6 +352,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// clearing the relatedFormInputs and inputValues to be set for the next click
 							//relatedFormInputs.clear();
 						}
+						break;
+					case "asserton":
+						// TODO: not yet accomplished in instrumentation step
+						String assertion = methodValue.get(1);
+						firstConsumer.getContext().getCurrentState().addAssertion(assertion);
 						break;
 					default:
 				}
@@ -473,6 +483,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						// System.out.println("xpath : " + xpath2);
 						CandidateElement candidateElement = new CandidateElement(sourceElement, new Identification(Identification.How.xpath, xpath2), "");
 						LOG.debug("Found new candidate element: {} with eventableCondition {}",	candidateElement.getUniqueString(), null);
+						
+						// TODO: should only add asserted elements
+						// creating an AssertedElementPattern from sourceElement
+						String assertion = "";
+						AssertedElementPattern aep = new AssertedElementPattern(sourceElement, assertion);
+						assertedElementPatterns.add(aep);
+						System.out.println(aep);
+						
+						
 						candidateElement.setEventableCondition(null);
 						return candidateElement;
 					}
@@ -538,6 +557,23 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		return xpath;
 	} 
 	
+	public void addToAssertedElementPatterns(AssertedElementPattern aep){
+		
+		// TODO: check availability for later tme...
+		/*
+		// check if aep structure matches one in the assertedElementPatterns list
+		for (AssertedElementPattern a: assertedElementPatterns){
+			if (a.matchPatternStructure(aep)){
+				// aep structure already exist in the assertedElementPatterns list, add assertion and inc the count
+				a.increaseCount();
+				a.addAssertion(aep.getAssertion().get(0)); // aep has only one assertion at this point
+				return;
+			}
+		}
+		*/
+		assertedElementPatterns.add(aep);
+	}
+	
 	
 	
 	/**
@@ -555,6 +591,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	@Override
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
+		
+		for (AssertedElementPattern	aep: assertedElementPatterns)
+			System.out.println(aep);
+		
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
 
