@@ -74,7 +74,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	CrawljaxConfiguration config = null;
 	
 	private ArrayList<AssertedElementPattern> assertedElementPatterns = new ArrayList<AssertedElementPattern>();
-	//private ArrayList<AssertedElementPattern> assertedElementPatterns = new ArrayList<AssertedElementPattern>();
 	
 	
 	public TestSuiteExtension() {
@@ -356,7 +355,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					case "asserton":
 						// TODO: not yet accomplished in instrumentation step
 						String assertion = methodValue.get(1);
-						firstConsumer.getContext().getCurrentState().addAssertion(assertion);
+						// we have not seen the element yet...
+						AssertedElementPattern aep = new AssertedElementPattern(sourceElement, assertion);
+						assertedElementPatterns.add(aep);
+						System.out.println(aep);
+						
+						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(assertion);
 						break;
 					default:
 				}
