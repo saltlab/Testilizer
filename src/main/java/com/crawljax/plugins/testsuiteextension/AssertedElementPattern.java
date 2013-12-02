@@ -2,9 +2,17 @@ package com.crawljax.plugins.testsuiteextension;
 
 import java.util.ArrayList;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+
+import com.crawljax.core.configuration.CrawlElement;
+import com.crawljax.core.configuration.CrawljaxConfiguration;
+import com.crawljax.util.DomUtils;
+import com.crawljax.util.XPathHelper;
+
 /**
  * AssertedElementPattern is used to store informations about a DOM element accessed pattern in a Selenium assertion.
- * This pattern contains: The asserted element node, its parent node, and its children nodes
+ * This pattern contains: The asserted element node, its parent node, its children nodes, its count of occurrence in test suite, and its associated assertion(s)
  * 
  * @author Amin Milani Fard
  */
@@ -23,8 +31,13 @@ public class AssertedElementPattern {
 	private ArrayList<String> childrenTagName = new ArrayList<String>();
 	private ArrayList<String> childrenTextContent = new ArrayList<String>();
 	private ArrayList<ArrayList<String>> childrenAttributes = new ArrayList<ArrayList<String>>();
-
-	public AssertedElementPattern(org.w3c.dom.Element sourceElement){
+	// count of occurrence in test suite
+	private int count = 0;	
+	// assertion(s) associated to this element
+	private ArrayList<String> assertions = new ArrayList<String>();
+	
+	
+	public AssertedElementPattern(org.w3c.dom.Element sourceElement, String assertion){
 		this.sourceElement = sourceElement;
 		// node info
 		tagName = sourceElement.getTagName();
@@ -50,8 +63,28 @@ public class AssertedElementPattern {
 			}
 			childAttributes.clear();
 		}
+		
+		this.assertions.add(assertion);
+	}
+	
+	public void increaseCount(){
+		count++;
+	}
+	
+	public int getCount(){
+		return count;
 	}
 
+	public void addAssertion(String assertion){
+		assertions.add(assertion);
+	}
+	
+	public ArrayList<String> getAssertion(){
+		return assertions;
+	}
+	
+	
+	
 	@Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -79,7 +112,35 @@ public class AssertedElementPattern {
 				+ ", parentAttributes=" + parentAttributes
 				+ ", childrenTagName=" + childrenTagName
 				+ ", childrenTextContent=" + childrenTextContent
-				+ ", childrenAttributes=" + childrenAttributes + "]";
+				+ ", childrenAttributes=" + childrenAttributes + ", count=" + count + ", assertions=" + assertions + "]";
 	}
+	
+	public boolean findAssertedElementPattern(Document dom, CrawljaxConfiguration config){
+		// finding the pattern of this object in the DOM using Crawljax configuration  
+		for (CrawlElement crawlTag : config.getCrawlRules().getAllCrawlElements()) {
+			// checking all tags defined in the crawlRules
+			NodeList nodeList = dom.getElementsByTagName(crawlTag.getTagName());
+				String xpath = null;
+				org.w3c.dom.Element sourceElement = null;
+				for (int k = 0; k < nodeList.getLength(); k++){
+					sourceElement = (org.w3c.dom.Element) nodeList.item(k);
+					AssertedElementPattern aep = new AssertedElementPattern(sourceElement, "");
+					// check if aep equals this object
+					if (this.equals(aep)){
+						System.out.println("sourceElement:" + sourceElement + " in the DOM has an AssertedElementPattern: " + this);
+						return true;
+					}
+				}
+		}
+		return false;
+	}
+	
+	public boolean matchPatternStructure(AssertedElementPattern aep){
+        if (!aep.tagName.equals(this.tagName) || !aep.parentTagName.equals(this.parentTagName) || !aep.childrenTagName.equals(this.childrenTagName)) {  
+            return false;
+        }
+        return true;
+	}
+	
 	
 }
