@@ -54,6 +54,7 @@ import com.crawljax.core.state.Eventable.EventType;
 import com.crawljax.core.state.Identification.How;
 import com.crawljax.forms.FormInput;
 import com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor;
+import com.crawljax.util.AssertedElementPattern;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.util.DomUtils;
@@ -73,6 +74,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	private EmbeddedBrowser browser = null;
 	CrawljaxConfiguration config = null;
 	
+	org.w3c.dom.Element lastAccessedSourceElement = null;
 	private ArrayList<AssertedElementPattern> assertedElementPatterns = new ArrayList<AssertedElementPattern>();
 	
 	
@@ -90,8 +92,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("TestSuiteExtension plugin started");
 
 		// Bypassing instrumenting and getting exec trace if already done
-		if(true)
-			return;
+		//if(true)
+		//	return;
 		
 		
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
@@ -221,8 +223,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	@Override
 	public void initialPathExecution(CrawljaxConfiguration conf, CrawlTaskConsumer firstConsumer) {
-		//if (true)
-		//	return;
+		if (true)
+			return;
 		
 		browser = firstConsumer.getContext().getBrowser();
 		config = conf;
@@ -243,7 +245,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		for (String st: trace){
 			// read the value such as id, cssSelector, xpath, and etc. 
 			ArrayList<String> methodValue = new ArrayList<String>();
-
 
 			if (st.equals("TestSuiteBegin"))
 				continue; // ignoring for now, may be considered in future
@@ -344,7 +345,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								LOG.info("webElement {} not clicked because not all crawl conditions where satisfied",	webElement);
 
 
-
 							// Applying the click with the form input values
 							//webElement.click();
 
@@ -352,15 +352,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							//relatedFormInputs.clear();
 						}
 						break;
-					case "asserton":
+					case "assertion":
 						// TODO: not yet accomplished in instrumentation step
 						String assertion = methodValue.get(1);
 						// we have not seen the element yet...
-						AssertedElementPattern aep = new AssertedElementPattern(sourceElement, assertion);
+						AssertedElementPattern aep = new AssertedElementPattern(lastAccessedSourceElement, assertion);
 						assertedElementPatterns.add(aep);
 						System.out.println(aep);
 						
-						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(assertion);
+						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
 						break;
 					default:
 				}
@@ -424,7 +424,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	private ArrayList<String> getMethodValue(String s){
 		String[] withParameter = {"id:", "name:", "xpath:", "tag name:", "class name:", "css selector:", "link text:", "partial link text:", 
-				"sendKeys"};
+				"sendKeys", "assertion"};
 
 		String[] withoutParameter = {"clear", "click"}; 
 		
@@ -434,7 +434,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		for (int i=0; i<withParameter.length; i++){
 			if (s.contains(withParameter[i])){
 				startIndexOfValue = s.indexOf(withParameter[i]) + withParameter[i].length() + 1;
-				if (withParameter[i].equals("sendKeys"))
+				if (withParameter[i].equals("sendKeys") || withParameter[i].equals("assertion"))
 					endIndexOfValue = s.length();
 				else
 					endIndexOfValue = s.length()-1;
@@ -491,6 +491,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						// TODO: should only add asserted elements
 						// creating an AssertedElementPattern from sourceElement
 						String assertion = "";
+						lastAccessedSourceElement = sourceElement;
 						AssertedElementPattern aep = new AssertedElementPattern(sourceElement, assertion);
 						assertedElementPatterns.add(aep);
 						System.out.println(aep);
@@ -592,10 +593,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				state.getName(), candidateElements.size());
 	}
 
-
 	@Override
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
-		
+		System.out.println("List of asserted element paterns:");
 		for (AssertedElementPattern	aep: assertedElementPatterns)
 			System.out.println(aep);
 		
