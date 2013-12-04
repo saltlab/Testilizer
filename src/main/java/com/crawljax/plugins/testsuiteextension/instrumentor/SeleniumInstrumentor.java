@@ -97,14 +97,14 @@ public class SeleniumInstrumentor {
 				System.out.println("testcase: " + testCaseMethod.getName());
 
 				ArrayList<MethodCallExpr> methodCalls = tcp.getMethodCalls(testCaseMethod, TestCaseParser.seleniumDomRelatedMethodCallList);
-				System.out.println("*******");
-				for (MethodCallExpr mce : methodCalls)
-					System.out.println(mce);
+				//System.out.println("*******");
+				//for (MethodCallExpr mce : methodCalls)
+				//	System.out.println(mce);
 
-				ArrayList<MethodCallExpr> methodCalls2 = tcp.getMethodCalls(testCaseMethod, TestCaseParser.seleniumAssertionMethodCallList);
-				System.out.println("*******");
-				for (MethodCallExpr mce2 : methodCalls2)
-					System.out.println(mce2);
+				//ArrayList<MethodCallExpr> methodCalls2 = tcp.getMethodCalls(testCaseMethod, TestCaseParser.seleniumAssertionMethodCallList);
+				//System.out.println("*******");
+				//for (MethodCallExpr mce2 : methodCalls2)
+				//	System.out.println(mce2);
 
 				
 				// add a body to the method
@@ -129,7 +129,6 @@ public class SeleniumInstrumentor {
 							System.out.println("mce: " + mce);
 							
 							if (mce.getName().equals("assertTrue")){
-								
 								String codeToInstrumentOn = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.assertionModeOn";
 								String codeToInstrumentOff = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.assertionModeOff";
 								MethodCallExpr callOn = new MethodCallExpr(null, codeToInstrumentOn);
