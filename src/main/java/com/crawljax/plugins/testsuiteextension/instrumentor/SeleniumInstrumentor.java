@@ -128,7 +128,9 @@ public class SeleniumInstrumentor {
 							
 							System.out.println("mce: " + mce);
 							
-							if (mce.getName().equals("assertTrue")){
+							//	Instrumenting assertions...
+
+							if (mce.getName().equals("assertTrue") || mce.getName().equals("assertEquals") || mce.getName().equals("assertNotNull") || mce.getName().equals("assertNull")){
 								String codeToInstrumentOn = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.assertionModeOn";
 								String codeToInstrumentOff = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.assertionModeOff";
 								MethodCallExpr callOn = new MethodCallExpr(null, codeToInstrumentOn);
@@ -138,12 +140,12 @@ public class SeleniumInstrumentor {
 								Statement Poststmt = new ExpressionStmt(callOff);
 								
 								ASTHelper.addStmt(block, PreStmt);
+								ASTHelper.addStmt(block, stmt);
 
 								String instrumentableString = makeInstrumentableString(mce.toString());
 								inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
 								ASTHelper.addStmt(block, inject);
 
-								ASTHelper.addStmt(block, stmt);
 								ASTHelper.addStmt(block, Poststmt);
 								inject = null;	// set inject back to null to prevent redundant injection
 																
@@ -187,12 +189,7 @@ public class SeleniumInstrumentor {
 					this.instrumentMethodCall(mce);
 					System.out.println("mce: " + mce);
 				}
-			}	
-
-			
-			
-			// TODO: Instrument assertions...
-			
+			}				
 		
 			if (writeBack == true){
 				String newFileLoc = System.getProperty("user.dir");
@@ -228,8 +225,6 @@ public class SeleniumInstrumentor {
 		result = result.replace("\"", "\\\"");
 		return result;
 	}
-
-
 
 
 	public MethodCallExpr instrumentMethodCall(MethodCallExpr mce) {

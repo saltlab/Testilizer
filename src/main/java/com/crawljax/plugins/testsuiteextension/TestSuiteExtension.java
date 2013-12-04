@@ -19,6 +19,13 @@ import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
+import javax.xml.xpath.XPathFactory;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+
 
 import org.junit.runner.JUnitCore;
 import org.openqa.selenium.By;
@@ -82,7 +89,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	private EmbeddedBrowser browser = null;
 	CrawljaxConfiguration config = null;
 	
-	org.w3c.dom.Element lastAccessedSourceElement = null;
 	private ArrayList<AssertedElementPattern> assertedElementPatterns = new ArrayList<AssertedElementPattern>();
 
 	private boolean inAssertionMode = false;
@@ -337,6 +343,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						if (webElement!=null){
 							// generate corresponding Eventable for webElement
 							event = getCorrespondingEventable(webElement, EventType.click, browser);
+
+							String xpath = getXPath(webElement);
+							try {
+
+								String xpath2 = XPathHelper.getXPathExpression(getElementFromXpath(xpath, browser));
+								System.out.println("fast Element found has xpath: " + xpath2);
+
+								//System.out.println("Fast Element found is: " + getElementFromXpath(xpath, browser));
+							} catch (XPathExpressionException e) {
+								e.printStackTrace();
+							}
+
+							
 							
 							//System.out.println("setting form inputs with: " + relatedFormInputs);
 							
@@ -358,7 +377,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							else
 								LOG.info("webElement {} not clicked because not all crawl conditions where satisfied",	webElement);
 
-
 							// Applying the click with the form input values
 							//webElement.click();
 
@@ -366,14 +384,57 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							//relatedFormInputs.clear();
 						}
 						break;
+					
+					/****** Cases for assertions ******/
+						
+					case "By.id:":
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.id(howValue));
+						break;
+					case "By.linkText:":
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.linkText(howValue));
+						break;
+					case "By.partialLinkText:":
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.partialLinkText(howValue));
+						break;
+					case "By.name:":
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.name(howValue));
+						break;
+					case "By.tagName:":
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.tagName(howValue));
+						break;
+					case "By.xpath:":
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.xpath(howValue));
+						break;
+					case "By.className:":
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.className(howValue));
+						break;
+					case "By.selector:":
+						howValue = methodValue.get(1);
+						webElement = browser.getBrowser().findElement(By.cssSelector(howValue));
+						break;
 					case "assertion":
-						// TODO: not yet accomplished in instrumentation step
 						String assertion = methodValue.get(1);
-						// we have not seen the element yet...
-						AssertedElementPattern aep = new AssertedElementPattern(lastAccessedSourceElement, assertion);
+						// The call to getCorrespondingCandidateElement() fills the lastAccessedSourceElement with the org.w3c.dom.Element object accessed in the assertion
+						String xpath = getXPath(webElement);
+						org.w3c.dom.Element assertedSourceElement = null;
+
+						try {
+							assertedSourceElement = getElementFromXpath(xpath, browser);
+							System.out.println("The assertedSourceElement is: " + assertedSourceElement);
+						} catch (XPathExpressionException e) {
+							e.printStackTrace();
+						}
+
+						AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion);
 						assertedElementPatterns.add(aep);
 						System.out.println(aep);
-						
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
 						break;
 					default:
@@ -438,8 +499,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	private ArrayList<String> getMethodValue(String s){
 		String[] withParameter = {" id:", " name:", " xpath:", " tag name:", " class name:", " css selector:", " link text:", " partial link text:", 
-				"sendKeys", "assertion"};
-		String[] withParameterForAssertion = {"By.id:", "By.linkText:", "By.partialLinkText:", "By.name:", "By.tagName:", "By.xpath:", "By.className:", "By.selector:"};
+				"sendKeys"};
+		String[] withParameterForAssertion = {"assertion", "By.id:", "By.linkText:", "By.partialLinkText:", "By.name:", "By.tagName:", "By.xpath:", "By.className:", "By.selector:"};
 		String[] withoutParameter = {"clear", "click"}; 
 
 		ArrayList<String> methodValue = new ArrayList<String>();
@@ -464,7 +525,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			for (int i=0; i<withParameter.length; i++){
 				if (s.contains(withParameter[i])){
 					startIndexOfValue = s.indexOf(withParameter[i]) + withParameter[i].length() + 1;
-					if (withParameter[i].equals("sendKeys") || withParameter[i].equals("assertion"))
+					if (withParameter[i].equals("sendKeys"))
 						endIndexOfValue = s.length();
 					else
 						endIndexOfValue = s.length()-1;
@@ -503,7 +564,16 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		Document dom;
 		try {
 			dom = DomUtils.asDocument(browser.getStrippedDomWithoutIframeContent());
-
+			
+			// Efficient way to get the corresponding org.w3c.dom.Element of a WebElement
+			String xpath = getXPath(webElement);
+			org.w3c.dom.Element sourceElement = getElementFromXpath(xpath, browser);
+			CandidateElement candidateElement = new CandidateElement(sourceElement, new Identification(Identification.How.xpath, xpath), "");
+			LOG.debug("Found new candidate element: {} with eventableCondition {}",	candidateElement.getUniqueString(), null);
+			candidateElement.setEventableCondition(null);
+			return candidateElement;
+			
+			/* Previous inefficient way
 			for (CrawlElement crawlTag : config.getCrawlRules().getAllCrawlElements()) {
 				// checking all tags defined in the crawlRules
 				NodeList nodeList = dom.getElementsByTagName(crawlTag.getTagName());
@@ -516,29 +586,24 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					sourceElement = (org.w3c.dom.Element) nodeList.item(k);
 					// check if sourceElement is webElement
 					if (checkEqulity(webElement, sourceElement)){
-						xpath2 = XPathHelper.getXPathExpression(sourceElement);
+						xpath2 = XPathHelper.getXPathExpression(sourceElement);						
 						// System.out.println("xpath : " + xpath2);
 						CandidateElement candidateElement = new CandidateElement(sourceElement, new Identification(Identification.How.xpath, xpath2), "");
 						LOG.debug("Found new candidate element: {} with eventableCondition {}",	candidateElement.getUniqueString(), null);
-						
-						// TODO: should only add asserted elements
-						// creating an AssertedElementPattern from sourceElement
-						String assertion = "";
-						lastAccessedSourceElement = sourceElement;
-						AssertedElementPattern aep = new AssertedElementPattern(sourceElement, assertion);
-						assertedElementPatterns.add(aep);
-						System.out.println(aep);
-						
-						
 						candidateElement.setEventableCondition(null);
 						return candidateElement;
 					}
 				}
-			}
-		} catch (IOException e) {
+			}*/
+		} catch (XPathExpressionException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
 		System.out.println("could not find the corresponding CandidateElement");
 		return null;
 	}
@@ -594,9 +659,26 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		String xpath = (String) browser.executeJavaScriptWithParam(jscript, element);
 		return xpath;
 	} 
-	
+
+
+	public org.w3c.dom.Element getElementFromXpath(String xpathToRetrieve, EmbeddedBrowser browser) throws XPathExpressionException {
+		Document dom;
+		org.w3c.dom.Element element = null;
+		try {
+			dom = DomUtils.asDocument(browser.getStrippedDomWithoutIframeContent());
+	        XPath xPath = XPathFactory.newInstance().newXPath();
+	        // this works gets the value of the node
+	        //System.out.println("value is " + xPath.evaluate(xpathToRetrieve, dom));
+			element = (org.w3c.dom.Element) xPath.evaluate(xpathToRetrieve, dom, XPathConstants.NODE);
+			//System.out.println("element.getNodeName(): " + element.getNodeName());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return element;
+	}	
+
 	public void addToAssertedElementPatterns(AssertedElementPattern aep){
-		
+
 		// TODO: check availability for later tme...
 		/*
 		// check if aep structure matches one in the assertedElementPatterns list

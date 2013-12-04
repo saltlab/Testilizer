@@ -22,23 +22,13 @@ import com.crawljax.plugins.utils.MethodCallVisitor;
 
 public class TestCaseParser {
 
-	//public static final String[] seleniumDomRelatedMethodCallList = new String[] { "findElement", "sendKeys", "clear", "click" };
-	public static final String[] seleniumDomRelatedMethodCallList = new String[] { "sendKeys", "clear", "click" , "findElement", "assertTrue" };
-	public static final String[] seleniumAssertionMethodCallList = new String[] { "assertEquals", "assertTrue", "assertNotNull", "assertNull" };
+	public static final String[] seleniumDomRelatedMethodCallList = new String[] { "sendKeys", "clear", "click" , "findElement", "assertTrue", "assertEquals", "assertNotNull", "assertNull" };
 
 	public HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> getSeleniumDomRelateMethodCallExpressions(CompilationUnit cu) throws FileNotFoundException, ParseException, IOException {
 		ArrayList<MethodDeclaration> testMethodsofCompilationUnit = CompilationUnitUtils.testMethodsofCompilationUnit(cu);
 		return getMethodCallExpressions(testMethodsofCompilationUnit, seleniumDomRelatedMethodCallList);
 
 	}
-
-	
-	public HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> getSeleniumAssertionMethodCallExpressions(CompilationUnit cu) throws FileNotFoundException, ParseException, IOException {
-		ArrayList<MethodDeclaration> testMethodsofCompilationUnit = CompilationUnitUtils.testMethodsofCompilationUnit(cu);
-		return getMethodCallExpressions(testMethodsofCompilationUnit, seleniumAssertionMethodCallList);
-
-	}
-
 	
 	private HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> getMethodCallExpressions(ArrayList<MethodDeclaration> testMethodsofCompilationUnit, String[] methodCalls) {
 		HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> domRelateMethodCallExps = new HashMap<MethodDeclaration, ArrayList<MethodCallExpr>>();
@@ -63,13 +53,6 @@ public class TestCaseParser {
 		CompilationUnit cu = getCompilationUnitOfFileName(fileName);
 		return getSeleniumDomRelateMethodCallExpressions(cu);
 	}
-
-	
-	public HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> getSeleniumAssertionMethodCallExpressions(String fileName) throws FileNotFoundException, ParseException, IOException {
-		CompilationUnit cu = getCompilationUnitOfFileName(fileName);
-		return getSeleniumAssertionMethodCallExpressions(cu);
-	}
-
 		
 	public static CompilationUnit getCompilationUnitOfFileName(String fileName) throws FileNotFoundException, ParseException, IOException {
 		FileInputStream in = new FileInputStream(fileName);
