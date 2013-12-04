@@ -17,6 +17,7 @@ import japa.parser.ast.expr.MethodCallExpr;
 import japa.parser.ast.expr.NameExpr;
 import japa.parser.ast.expr.StringLiteralExpr;
 import japa.parser.ast.stmt.BlockStmt;
+import japa.parser.ast.stmt.ExpressionStmt;
 import japa.parser.ast.stmt.Statement;
 import japa.parser.ast.type.PrimitiveType;
 import japa.parser.ast.type.Type;
@@ -96,9 +97,16 @@ public class SeleniumInstrumentor {
 				System.out.println("testcase: " + testCaseMethod.getName());
 
 				ArrayList<MethodCallExpr> methodCalls = tcp.getMethodCalls(testCaseMethod, TestCaseParser.seleniumDomRelatedMethodCallList);
-				//for (MethodCallExpr mce : methodCalls)
-				//	System.out.println(mce);
+				System.out.println("*******");
+				for (MethodCallExpr mce : methodCalls)
+					System.out.println(mce);
 
+				ArrayList<MethodCallExpr> methodCalls2 = tcp.getMethodCalls(testCaseMethod, TestCaseParser.seleniumAssertionMethodCallList);
+				System.out.println("*******");
+				for (MethodCallExpr mce2 : methodCalls2)
+					System.out.println(mce2);
+
+				
 				// add a body to the method
 				BlockStmt block = new BlockStmt();
 
@@ -117,6 +125,34 @@ public class SeleniumInstrumentor {
 					for (MethodCallExpr mce : methodCalls) {
 						if (stmt.toString().contains(mce.toString())){
 							Statement inject = null;
+							
+							System.out.println("mce: " + mce);
+							
+							if (mce.getName().equals("assertTrue")){
+								
+								String codeToInstrumentOn = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.assertionModeOn";
+								String codeToInstrumentOff = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.assertionModeOff";
+								MethodCallExpr callOn = new MethodCallExpr(null, codeToInstrumentOn);
+								MethodCallExpr callOff = new MethodCallExpr(null, codeToInstrumentOff);
+
+								Statement PreStmt = new ExpressionStmt(callOn);
+								Statement Poststmt = new ExpressionStmt(callOff);
+								
+								ASTHelper.addStmt(block, PreStmt);
+
+								String instrumentableString = makeInstrumentableString(mce.toString());
+								inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+								ASTHelper.addStmt(block, inject);
+
+								ASTHelper.addStmt(block, stmt);
+								ASTHelper.addStmt(block, Poststmt);
+								inject = null;	// set inject back to null to prevent redundant injection
+																
+								//String instrumentableString = makeInstrumentableString(mce.toString());
+								//inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+								//System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+							}
+							
 							if (mce.getName().equals("clear") || mce.getName().equals("click") || mce.getName().equals("sendKeys")){
 								// instrument with a new code
 								List<Expression> args = mce.getArgs();
@@ -124,9 +160,12 @@ public class SeleniumInstrumentor {
 								if (args==null){
 									System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", \"\")." + mce.getName() + "();");
 									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", \"\")." + mce.getName() + "();");
+							        // e.g., com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement(driver.findElement(By.id("login")), "clear", "").clear();
+
 								}else{
 									System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
 									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
+									// e.g., com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement(driver.findElement(By.id("login")), "sendKeys", "nainy").sendKeys("nainy");
 								}
 							}
 							
@@ -138,7 +177,7 @@ public class SeleniumInstrumentor {
 				testCaseMethod.setBody(block);
 			}
 
-			
+		
 			HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> methodCalls = tcp.getSeleniumDomRelateMethodCallExpressions(cu);
 
 			for (MethodDeclaration e : methodCalls.keySet()) {
@@ -146,10 +185,10 @@ public class SeleniumInstrumentor {
 				System.out.println("testcase: " + e.getName());
 
 				for (MethodCallExpr mce : methodCalls.get(e)) {
-					//this.instrumentMethodCall(mce);
-					System.out.println(mce);
+					this.instrumentMethodCall(mce);
+					System.out.println("mce: " + mce);
 				}
-			}
+			}	
 
 			
 			
@@ -192,24 +231,27 @@ public class SeleniumInstrumentor {
 	}
 
 
+
+
 	public MethodCallExpr instrumentMethodCall(MethodCallExpr mce) {
 		List<Expression> oldArgs = mce.getArgs();
 		// create a methodcall expre
 		String codeToInstrument = null;
 		String methodCallName = mce.getName();
+		
+		System.out.println("mce.getName(): " + mce.getName());
+		
 		// logging the values
 		switch(mce.getName()){
 		case "findElement":
 			codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getBy";
 			break;
-		case "sendKeys":
-			codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getInput";
-			break;
+		//case "sendKeys":
+		//	codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getInput";
+		//	break;
 		case "clear":
 			System.out.println("CLEAR:");
 			break;
-
-		
 		}
 
 		if (codeToInstrument!=null){
@@ -226,46 +268,38 @@ public class SeleniumInstrumentor {
 
 
 	public static By getBy(By by) {
-		try {
-			FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
-			fw.write(by.toString() + "\n");
-			fw.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.err.println("IOException: " + e.getMessage());
-		}
+		writeToSeleniumExecutionTrace(by.toString());
 		System.out.println(by.toString());
 		lastUsedBy = by;
 		return by;
 	}
 
 	public static String getInput(String input) {
-		try {
-			FileWriter fw = new FileWriter(seleniumExecutionTrace,true); //appending new data
-			fw.write("sendKeys: " + input + "\n");
-			fw.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		writeToSeleniumExecutionTrace("sendKeys: " + input);
 		System.out.println("sendKeys: " + input);
-
 		return input;
 	}	
 
-
-
-	public static void parseStatement(String statement) {
-		// writing commands and values in separated to the seleniumExecutionTrace file
+	public static void getAssertion(String assertionStatement) {
+		// extracting assertion to be used
 		String action = null;
-		if (statement.contains(".clear()"))
-			action = "clear";
-		else if (statement.contains(".click()"))
-			action = "click";
-		
+		if (assertionStatement.contains(".getText()"))
+			action = "getText";
 		if (action!=null)
-			writeToSeleniumExecutionTrace(action);
+			writeToSeleniumExecutionTrace("assertion " + assertionStatement);
 	}
 
+	
+	public static void assertionModeOn() {
+		writeToSeleniumExecutionTrace("assertionModeOn");
+		System.out.println("assertionModeOn");
+	}
+	
+	public static void assertionModeOff() {
+		writeToSeleniumExecutionTrace("assertionModeOff");
+		System.out.println("assertionModeOff");
+	}	
+	
 	public static WebElement getWebElement(WebElement webElement, String method, String args) {
 		System.out.println("Performing " + method + " on: " + webElement);
 		writeToSeleniumExecutionTrace(webElement.toString());
