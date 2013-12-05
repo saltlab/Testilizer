@@ -108,8 +108,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("TestSuiteExtension plugin started");
 
 		// Bypassing instrumenting and getting exec trace if already done
-		if(true)
-			return;
+		//if(true)
+		//	return;
 		
 		
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
@@ -344,7 +344,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// generate corresponding Eventable for webElement
 							event = getCorrespondingEventable(webElement, EventType.click, browser);
 
-							String xpath = getXPath(webElement);
+							/*String xpath = getXPath(webElement);
 							try {
 
 								String xpath2 = XPathHelper.getXPathExpression(getElementFromXpath(xpath, browser));
@@ -353,9 +353,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								//System.out.println("Fast Element found is: " + getElementFromXpath(xpath, browser));
 							} catch (XPathExpressionException e) {
 								e.printStackTrace();
-							}
+							}*/
 
-							
 							
 							//System.out.println("setting form inputs with: " + relatedFormInputs);
 							
@@ -435,6 +434,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion);
 						assertedElementPatterns.add(aep);
 						System.out.println(aep);
+						// addig assertion to the current DOM state in the SFG
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
 						break;
 					default:
@@ -712,7 +712,16 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
 		System.out.println("List of asserted element paterns:");
 		for (AssertedElementPattern	aep: assertedElementPatterns)
-			System.out.println(aep);
+			System.out.println(aep.getAssertion());
+
+		System.out.println("***************");
+		
+		StateFlowGraph sfg = session.getStateFlowGraph();
+		for (StateVertex s: sfg.getAllStates()){
+			System.out.println("Assertion(s) on state " + s.getName());
+			for (int i=0;i<s.getAssertion().size();i++)
+				System.out.println(s.getAssertion().get(i));
+		}
 		
 		LOG.info("TestSuiteExtension plugin has finished");
 	}

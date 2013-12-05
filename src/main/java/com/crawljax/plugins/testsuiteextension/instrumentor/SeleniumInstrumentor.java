@@ -243,9 +243,9 @@ public class SeleniumInstrumentor {
 		//case "sendKeys":
 		//	codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getInput";
 		//	break;
-		case "clear":
-			System.out.println("CLEAR:");
-			break;
+		//case "clear":
+		//	System.out.println("CLEAR:");
+		//	break;
 		}
 
 		if (codeToInstrument!=null){
@@ -276,11 +276,7 @@ public class SeleniumInstrumentor {
 
 	public static void getAssertion(String assertionStatement) {
 		// extracting assertion to be used
-		String action = null;
-		if (assertionStatement.contains(".getText()"))
-			action = "getText";
-		if (action!=null)
-			writeToSeleniumExecutionTrace("assertion " + assertionStatement);
+		writeToSeleniumExecutionTrace("assertion " + assertionStatement);
 	}
 
 	
