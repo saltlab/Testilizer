@@ -108,8 +108,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("TestSuiteExtension plugin started");
 
 		// Bypassing instrumenting and getting exec trace if already done
-		//if(true)
-		//	return;
+		if(true)
+			return;
 		
 		
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
@@ -262,14 +262,18 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			// read the value such as id, cssSelector, xpath, and etc. 
 			ArrayList<String> methodValue = new ArrayList<String>();
 
-			if (st.equals("TestSuiteBegin"))
+			if (st.equals("TestSuiteBegin")){
+				System.out.println("TestSuiteBegin");
 				continue; // ignoring for now, may be considered in future
+			}
 
 			if (st.equals("TestSuiteEnd"))
 				break; // terminating the execution of happy paths
 
-			if (st.equals("NewTestCase"))
+			if (st.equals("NewTestCase")){
+				System.out.println("NewTestCase");
 				firstConsumer.getCrawler().reset();
+			}
 
 			else{
 				methodValue = getMethodValue(st);
@@ -362,7 +366,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 							CopyOnWriteArrayList<FormInput> formInputsToCheck = event.getRelatedFormInputs();
 
-							System.out.println("formInputsToCheck: " + formInputsToCheck);							
+							//System.out.println("formInputsToCheck: " + formInputsToCheck);							
 
 							firstConsumer.getCrawler().handleInputElements(event);
 							firstConsumer.getCrawler().waitForRefreshTagIfAny(event);
@@ -417,25 +421,39 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					case "By.selector:":
 						howValue = methodValue.get(1);
 						webElement = browser.getBrowser().findElement(By.cssSelector(howValue));
+						System.out.println("Found webElement: " + webElement);
 						break;
 					case "assertion":
-						String assertion = methodValue.get(1);
-						// The call to getCorrespondingCandidateElement() fills the lastAccessedSourceElement with the org.w3c.dom.Element object accessed in the assertion
-						String xpath = getXPath(webElement);
+						
 						org.w3c.dom.Element assertedSourceElement = null;
+						String assertion = methodValue.get(1);
+						
+						if (assertion.contains(".findElement")){	// only for assertions that access a DOM element
 
-						try {
-							assertedSourceElement = getElementFromXpath(xpath, browser);
-							System.out.println("The assertedSourceElement is: " + assertedSourceElement);
-						} catch (XPathExpressionException e) {
-							e.printStackTrace();
+							System.out.println("methodValue.get(1): " + methodValue.get(1));
+							//wait.until(ExpectedConditions.presenceOfElementLocated(By.linkText(linkText)));
+
+							// The call to getCorrespondingCandidateElement() fills the lastAccessedSourceElement with the org.w3c.dom.Element object accessed in the assertion
+							String xpath = getXPath(webElement);
+							//System.out.println("webElement:" + webElement);
+
+
+							try {
+								assertedSourceElement = getElementFromXpath(xpath, browser);
+								System.out.println("The assertedSourceElement is: " + assertedSourceElement);
+							} catch (XPathExpressionException e) {
+								System.out.println("XPathExpressionException!");
+								e.printStackTrace();
+							}
 						}
 
 						AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion);
 						assertedElementPatterns.add(aep);
-						System.out.println(aep);
+						//System.out.println(aep);
 						// addig assertion to the current DOM state in the SFG
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
+
+
 						break;
 					default:
 				}

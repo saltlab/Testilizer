@@ -55,7 +55,6 @@ public class SeleniumInstrumentor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(SeleniumInstrumentor.class);
 
-	public static By lastUsedBy;
 	public static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
 
 	public SeleniumInstrumentor() {
@@ -264,7 +263,6 @@ public class SeleniumInstrumentor {
 	public static By getBy(By by) {
 		writeToSeleniumExecutionTrace(by.toString());
 		System.out.println(by.toString());
-		lastUsedBy = by;
 		return by;
 	}
 
@@ -297,7 +295,7 @@ public class SeleniumInstrumentor {
 		return webElement;
 	}	
 
-	public static void writeToSeleniumExecutionTrace(String string) {
+	public static synchronized void writeToSeleniumExecutionTrace(String string) {
 		try {
 			FileWriter fw = new FileWriter(seleniumExecutionTrace, true); //appending new data
 			fw.write(string + "\n");
