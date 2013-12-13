@@ -41,6 +41,8 @@ import org.openqa.selenium.internal.FindsByXPath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 
@@ -276,6 +278,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				firstConsumer.getCrawler().reset();
 			}
 
+			if (st.equals("reset")){
+				System.out.println("Reseting to the index page...");
+				firstConsumer.getCrawler().reset();
+			}
+			
 			else{
 				methodValue = getMethodValue(st);
 				
@@ -387,7 +394,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 							if (fired){
 								// inspecting DOM changes and adding to SFG
-								firstConsumer.getCrawler().inspectNewState(event);
+								firstConsumer.getCrawler().inspectNewStateForInitailPaths(event);
 								
 								// if new a state is added reuse assertions for the new state
 								//int currNumOfStates = firstConsumer.getCrawler().getContext().getSession().getStateFlowGraph().getNumberOfStates();
@@ -486,7 +493,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
 		
 		CrawlSession session = firstConsumer.getContext().getSession();
-		saveSFG(session);
+		
+		//saveSFG(session);
 		
 	}
 
@@ -719,7 +727,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	public void addToAssertedElementPatterns(AssertedElementPattern aep){
 
-		// TODO: check availability for later tme...
+		// TODO: check availability for later time...
 		/*
 		// check if aep structure matches one in the assertedElementPatterns list
 		for (AssertedElementPattern a: assertedElementPatterns){
@@ -755,28 +763,83 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			System.out.println(aep.getAssertion());
 
 		System.out.println("***************");
-		
-		System.out.println("List of asserted element paterns in states:");
+
 		StateFlowGraph sfg = session.getStateFlowGraph();
-		
 		for (StateVertex s: sfg.getAllStates()){
-			if (s.getAssertion().size()>0){
-
-				System.out.println("DOM on state " + s.getName() + " is: " + s.getDom());
-				System.out.println("Assertion(s) on state " + s.getName());
-
-				for (int i=0;i<s.getAssertion().size();i++)
-					System.out.println(s.getAssertion().get(i));
-				for (int i=0;i<s.getAssertedElementPatters().size();i++)
-					System.out.println(s.getAssertedElementPatters().get(i));
-
+			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
+			System.out.println("There are " + s.getAssertions().size() + " asserted element paterns in state " + s.getName() + " before regeneration.");
+			if (s.getAssertions().size()>0){
+				for (int i=0;i<s.getAssertions().size();i++)
+					System.out.println(s.getAssertions().get(i));
 			}
+
+			for (AssertedElementPattern	aep: assertedElementPatterns){
+				if (!s.getAssertions().contains(aep.getAssertion())){
+					try {
+						Document dom = DomUtils.asDocument(s.getDom());
+						NodeList nodeList = dom.getElementsByTagName(aep.getTagName());
+
+						org.w3c.dom.Element element = null;
+						for (int i = 0; i < nodeList.getLength(); i++){
+							element = (org.w3c.dom.Element) nodeList.item(i);
+
+							AssertedElementPattern aepTemp = new AssertedElementPattern(element, ""); // creating an AssertedElementPattern without any assertion text
+							String howMatched = aep.getHowPatternMatch(aepTemp);
+							switch (howMatched){
+							case "PatternFullMatch":
+								System.out.println(aep);
+								System.out.println("PatternFullMatch");
+								System.out.println(aepTemp);
+								s.addAssertedElementPattern(aep);
+								break;
+							case "PatternTagMatch":
+								System.out.println(aep);
+								System.out.println("PatternTagMatch");
+								System.out.println(aepTemp);
+								s.addAssertedElementPattern(aep);
+								break;
+							case "ElementFullMatch":
+								//System.out.println(aep);
+								//System.out.println("ElementFullMatch");
+								//System.out.println(aepTemp);
+								break;
+							case "ElementTagMatch":
+								//System.out.println(aep);
+								//System.out.println("ElementTagMatch");
+								//System.out.println(aepTemp);
+								break;
+							}
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+
+				}
+
+				/*if (s.getAssertions().size()>0){
+					System.out.println("Assertion(s) on state " + s.getName());
+
+					for (int i=0;i<s.getAssertions().size();i++)
+						System.out.println(s.getAssertions().get(i));
+					for (int i=0;i<s.getAssertedElementPatters().size();i++)
+						System.out.println(s.getAssertedElementPatters().get(i));
+
+				}*/
+			}
+			
+			System.out.println("There are " + s.getAssertions().size() + " asserted element paterns in state " + s.getName() + " after regeneration.");
+			if (s.getAssertions().size()>0){
+				for (int i=0;i<s.getAssertions().size();i++)
+					System.out.println(s.getAssertions().get(i));
+			}
+			
 		}
-		
-		regenerateAssertions(sfg);
+
+		//regenerateAssertions(sfg);
 		
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
+
 
 	private void regenerateAssertions(StateFlowGraph sfg) {
 		
