@@ -43,6 +43,7 @@ import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.openqa.selenium.Alert;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
@@ -295,6 +296,13 @@ public class SeleniumInstrumentor {
 		return webElement;
 	}	
 
+	public static Alert getAlert(Alert alert, String action) {
+		System.out.println("Performing " + action + " on alert");
+		//writeToSeleniumExecutionTrace("Alert " + action);
+		writeToSeleniumExecutionTrace("Alert");
+		return alert;
+	}
+	
 	public static synchronized void writeToSeleniumExecutionTrace(String string) {
 		try {
 			FileWriter fw = new FileWriter(seleniumExecutionTrace, true); //appending new data
@@ -324,4 +332,5 @@ public class SeleniumInstrumentor {
 		}
 		return content;
 	}
+
 }

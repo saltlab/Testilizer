@@ -49,6 +49,7 @@ import com.crawljax.core.CandidateElement;
 import com.crawljax.core.CrawlSession;
 import com.crawljax.core.CrawlTaskConsumer;
 import com.crawljax.core.CrawlerContext;
+import com.crawljax.core.CrawljaxException;
 import com.crawljax.core.ExitNotifier.ExitStatus;
 import com.crawljax.core.configuration.CrawlElement;
 import com.crawljax.core.configuration.CrawljaxConfiguration;
@@ -286,6 +287,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					System.out.println("value: " + methodValue.get(1));
 								
 				switch (methodValue.get(0)){
+					case "Alert":
+						System.out.println("Closing the alert!");
+						// alert, prompt, and confirm behave as if the OK button is always clicked.
+						browser.executeJavaScript("window.alert = function(msg){return true;};"
+							        + "window.confirm = function(msg){return true;};"
+							        + "window.prompt = function(msg){return true;};");
+						break;
 					case " id:":
 						how = Identification.How.id;
 						howValue = methodValue.get(1);
@@ -371,11 +379,26 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							firstConsumer.getCrawler().handleInputElements(event);
 							firstConsumer.getCrawler().waitForRefreshTagIfAny(event);
 
+							// get number of states before firing events to check later if new a state is added
+							// No need for this part. New assertions will be regenerated after the crawling process is finished
+							// int prevNumOfStates = firstConsumer.getCrawler().getContext().getSession().getStateFlowGraph().getNumberOfStates();
+							
 							boolean fired = firstConsumer.getCrawler().fireEvent(event);
 
 							if (fired){
 								// inspecting DOM changes and adding to SFG
 								firstConsumer.getCrawler().inspectNewState(event);
+								
+								// if new a state is added reuse assertions for the new state
+								//int currNumOfStates = firstConsumer.getCrawler().getContext().getSession().getStateFlowGraph().getNumberOfStates();
+								//if (prevNumOfStates != currNumOfStates){
+								//	System.out.println("A new state is added. Try finding matched asserted element paterns from assertedElementPatterns...");
+								//	for (AssertedElementPattern	aep: assertedElementPatterns)
+								//		System.out.println(aep.getAssertion());
+								//		StateVertex currState = firstConsumer.getCrawler().getContext().getCurrentState();
+										//browser.getBrowser().
+								
+								//}
 							}
 							else
 								LOG.info("webElement {} not clicked because not all crawl conditions where satisfied",	webElement);
@@ -450,7 +473,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion);
 						assertedElementPatterns.add(aep);
 						//System.out.println(aep);
-						// addig assertion to the current DOM state in the SFG
+						// adding assertion to the current DOM state in the SFG
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
 
 
@@ -508,7 +531,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-
 	// TODO: This method should be rafactored later
 	/**
 	 * Returning method with value
@@ -525,7 +547,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		String value = null;
 		int startIndexOfValue, endIndexOfValue = 0;
 
-		if (s.equals("assertionModeOn"))
+		if (s.equals("Alert"))
+			methodValue.add("Alert");
+		else if (s.equals("assertionModeOn"))
 			inAssertionMode = true;
 		else if (s.equals("assertionModeOff"))
 			inAssertionMode = false;
@@ -570,7 +594,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	
 	private Eventable getCorrespondingEventable(WebElement webElement, EventType eventType, EmbeddedBrowser browser) {
 		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, browser);
 		Eventable event = new Eventable(candidateElement, eventType);
@@ -678,7 +701,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		return xpath;
 	} 
 
-
 	public org.w3c.dom.Element getElementFromXpath(String xpathToRetrieve, EmbeddedBrowser browser) throws XPathExpressionException {
 		Document dom;
 		org.w3c.dom.Element element = null;
@@ -728,21 +750,67 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	@Override
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
-		System.out.println("List of asserted element paterns:");
+		System.out.println("List of asserted element paterns in assertedElementPatterns:");
 		for (AssertedElementPattern	aep: assertedElementPatterns)
 			System.out.println(aep.getAssertion());
 
 		System.out.println("***************");
 		
+		System.out.println("List of asserted element paterns in states:");
 		StateFlowGraph sfg = session.getStateFlowGraph();
+		
 		for (StateVertex s: sfg.getAllStates()){
-			System.out.println("Assertion(s) on state " + s.getName());
-			for (int i=0;i<s.getAssertion().size();i++)
-				System.out.println(s.getAssertion().get(i));
+			if (s.getAssertion().size()>0){
+
+				System.out.println("DOM on state " + s.getName() + " is: " + s.getDom());
+				System.out.println("Assertion(s) on state " + s.getName());
+
+				for (int i=0;i<s.getAssertion().size();i++)
+					System.out.println(s.getAssertion().get(i));
+				for (int i=0;i<s.getAssertedElementPatters().size();i++)
+					System.out.println(s.getAssertedElementPatters().get(i));
+
+			}
 		}
+		
+		regenerateAssertions(sfg);
 		
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
+
+	private void regenerateAssertions(StateFlowGraph sfg) {
+		
+		ArrayList<AssertedElementPattern> assertedElementPatterns1 = new ArrayList<AssertedElementPattern>();
+		ArrayList<AssertedElementPattern> assertedElementPatterns2 = new ArrayList<AssertedElementPattern>();
+		
+		System.out.println("*** Regenerating Assertions ***");
+		for (StateVertex s1: sfg.getAllStates()){
+			for (StateVertex s2: sfg.getAllStates()){
+				if (s1.getId()!=s2.getId()){
+					assertedElementPatterns1 = s1.getAssertedElementPatters();
+					assertedElementPatterns2 = s2.getAssertedElementPatters();
+					for (AssertedElementPattern aep1: assertedElementPatterns1)
+						if (foundPatterninDOM(aep1, s2.getDom())){
+							s2.addAssertedElementPattern(aep1);
+						}
+					for (AssertedElementPattern aep2: assertedElementPatterns2)
+						if (foundPatterninDOM(aep2, s1.getDom())){
+							s1.addAssertedElementPattern(aep2);
+						}					
+				}
+				
+			}
+		}
+		
+	}
+	
+
+
+	private boolean foundPatterninDOM(AssertedElementPattern aep1, String dom) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
 
 	@Override
 	public String toString() {
