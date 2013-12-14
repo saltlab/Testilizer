@@ -786,17 +786,28 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							AssertedElementPattern aepTemp = new AssertedElementPattern(element, ""); // creating an AssertedElementPattern without any assertion text
 							String howMatched = aep.getHowPatternMatch(aepTemp);
 							switch (howMatched){
-							case "PatternFullMatch":
+							case "PatternFullTextMatch":
 								System.out.println(aep);
-								System.out.println("PatternFullMatch");
+								System.out.println("PatternFullTextMatch");
 								System.out.println(aepTemp);
 								s.addAssertedElementPattern(aep);
 								break;
+							case "PatternFullMatch":
+								//System.out.println(aep);
+								//System.out.println("PatternFullMatch");
+								//System.out.println(aepTemp);
+								//s.addAssertedElementPattern(aep);
+								break;
 							case "PatternTagMatch":
-								System.out.println(aep);
-								System.out.println("PatternTagMatch");
-								System.out.println(aepTemp);
-								s.addAssertedElementPattern(aep);
+								//System.out.println(aep);
+								//System.out.println("PatternTagMatch");
+								//System.out.println(aepTemp);
+								//s.addAssertedElementPattern(aep);
+								break;
+							case "ElementFullTextMatch":
+								//System.out.println(aep);
+								//System.out.println("ElementFullTextMatch");
+								//System.out.println(aepTemp);
 								break;
 							case "ElementFullMatch":
 								//System.out.println(aep);
