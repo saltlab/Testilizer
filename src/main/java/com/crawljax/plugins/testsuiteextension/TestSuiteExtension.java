@@ -71,6 +71,9 @@ import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.Eventable.EventType;
 import com.crawljax.core.state.Identification.How;
 import com.crawljax.forms.FormInput;
+import com.crawljax.plugins.testcasegenerator.JavaTestGenerator;
+import com.crawljax.plugins.testcasegenerator.TestMethod;
+import com.crawljax.plugins.testcasegenerator.TestSuiteGeneratorHelper;
 import com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor;
 import com.crawljax.util.AssertedElementPattern;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
@@ -848,12 +851,58 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		//regenerateAssertions(sfg);
 		
+		//generateTestSuite(session);
+		
 		LOG.info("TestSuiteExtension plugin has finished");
+	}
+
+	/**
+	 * Generating the extended test suite
+	 * @param session
+	 */
+	private void generateTestSuite(CrawlSession session) {
+		StateFlowGraph sfg = session.getStateFlowGraph();
+		
+		String TEST_SUITE_PATH = "src/test/java/generated";
+		String CLASS_NAME = "GeneratedTestCases";
+		String FILE_NAME_TEMPLATE = "TestCase.vm";
+
+		String XML_STATES = TEST_SUITE_PATH + "/states.xml";
+		String XML_EVENTABLES = TEST_SUITE_PATH + "/eventables.xml";
+
+			try {
+				DomUtils.directoryCheck(TEST_SUITE_PATH);
+			String fileName = null;
+
+			// the filename of the generated java test class, null otherwise
+			TestSuiteGeneratorHelper testSuiteGeneratorHelper = new TestSuiteGeneratorHelper(session);
+			List<TestMethod> testMethods = testSuiteGeneratorHelper.getTestMethods();
+
+				JavaTestGenerator generator =
+				        new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(),
+				                testMethods, session.getConfig());
+
+				testSuiteGeneratorHelper.writeStateVertexTestDataToXML(XML_STATES);
+				testSuiteGeneratorHelper.writeEventableTestDataToXML(XML_EVENTABLES);
+				generator.useXmlInSteadOfDB(XML_STATES, XML_EVENTABLES);
+
+				fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
+
+				System.out.println("Tests succesfully generated in " + fileName);		
+
+			} catch (IOException e) {
+				System.out.println("Error in checking " + TEST_SUITE_PATH);
+				e.printStackTrace();
+			} catch (Exception e) {
+				System.out.println("Error generating testsuite: " + e.getMessage());
+				e.printStackTrace();
+			}
+		
+		
 	}
 
 
 	private void regenerateAssertions(StateFlowGraph sfg) {
-		
 		ArrayList<AssertedElementPattern> assertedElementPatterns1 = new ArrayList<AssertedElementPattern>();
 		ArrayList<AssertedElementPattern> assertedElementPatterns2 = new ArrayList<AssertedElementPattern>();
 		
