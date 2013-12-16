@@ -131,11 +131,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			/**
 			 * (1) Instrumenting original Selenium unit test files
 			 */
+			String appName = "claroline";
+			
 			String originalFolderLoc = System.getProperty("user.dir");
 			// On Linux/Mac
-			//folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/originaltests/";
+			//folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/originaltests/";
 			// On Windows
-			originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\originaltests\\";
+			originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\originaltests\\";
 
 			File originalFolder = new File(originalFolderLoc);
 			LOG.info("originalFolderLoc: {} " , originalFolderLoc);
@@ -161,9 +163,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			 */
 			String instrumentedFolderLoc = System.getProperty("user.dir");
 			// On Linux/Mac
-			//folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/instrumentedtests/";
+			//folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/instrumentedtests/";
 			// On Windows
-			instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\instrumentedtests\\";
+			instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\instrumentedtests\\";
 
 			File instrumentedFolder = new File(instrumentedFolderLoc);
 			LOG.info("instrumentedFolderLoc: {}" , instrumentedFolderLoc);
