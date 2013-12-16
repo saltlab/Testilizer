@@ -81,8 +81,6 @@ import com.crawljax.core.state.Identification.How;
 import com.crawljax.forms.FormInput;
 import com.crawljax.plugins.testcasegenerator.JavaTestGenerator;
 import com.crawljax.plugins.testcasegenerator.TestMethod;
-import com.crawljax.plugins.testcasegenerator.TestMethodEvent;
-import com.crawljax.plugins.testcasegenerator.TestSuiteGeneratorHelper;
 import com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor;
 import com.crawljax.util.AssertedElementPattern;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
@@ -878,17 +876,26 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		StateFlowGraph sfg = session.getStateFlowGraph();
 		
 		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
-
-		Set<Eventable> uEvents = new HashSet<Eventable>();
-
+		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
+		
+		int counter = 0;
+		
 		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
-			System.out.println("List<GraphPath<StateVertex, Eventable>> paths : results");
+			//For each new sink node
+			
 			for (GraphPath<StateVertex, Eventable> p : paths) {
-				System.out.println("GraphPath<StateVertex, Eventable> p : paths");
+				//For each path to the sink node
+				TestMethod testMethod = new TestMethod("method" + Integer.toString(counter));
+				
 				for (Eventable edge : p.getEdgeList()) {
+					//For each eventable in the path
 					
-					System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
-					System.out.println("//" + edge.toString());
+					testMethod.addStatement("//From state " + Integer.toString(edge.getSourceStateVertex().getId()) 
+							+ " to state " + Integer.toString(edge.getTargetStateVertex().getId()));
+					testMethod.addStatement("//" + edge.toString());
+					
+					//System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
+					//System.out.println("//" + edge.toString());
 
 					if (edge.getRelatedFormInputs().size() > 0){
 						// First fill the inputs 
@@ -911,6 +918,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 											"(\"" + formInput.getIdentification().getValue() + "\")).sendKeys(\"" + 
 											formInput.getInputValues().iterator().next().getValue() + "\");";
 									
+									testMethod.addStatement(seleniumAction1);
+									testMethod.addStatement(seleniumAction2);
+
 									System.out.println(seleniumAction1);
 									System.out.println(seleniumAction2);
 									
@@ -927,55 +937,36 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("value: " + edge.getIdentification().getValue());
 					//System.out.println("text: " + edge.getElement().getText().replaceAll("\"", "\\\\\"").trim());
 
-					String seleniumAction1 = "driver.findElement(By." + edge.getIdentification().getHow().toString() +
+					String seleniumAction3 = "driver.findElement(By." + edge.getIdentification().getHow().toString() +
 							"(\"" + edge.getIdentification().getValue() + "\")).click();";
 					
-					System.out.println(seleniumAction1);
+					System.out.println(seleniumAction3);
+					testMethod.addStatement(seleniumAction3);
 
-					
+					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
-						for (int i=0;i<edge.getTargetStateVertex().getAssertions().size();i++)
-							System.out.println(edge.getTargetStateVertex().getAssertions().get(i));
+						for (int i=0;i<edge.getTargetStateVertex().getAssertions().size();i++){
+							System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
+							testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + ";");
+						}
 					}
 
-					//System.out.println("edge: " + edge.toString());
-					//if (!uEvents.contains(edge)) {
-					//	uEvents.add(edge);
-					//}
 				}
+				counter++;
+				testMethods.add(testMethod);
 			}
 		}
 
-		
 		String TEST_SUITE_PATH = "src/test/java/generated";
 		String CLASS_NAME = "GeneratedTestCases";
 		String FILE_NAME_TEMPLATE = "TestCase.vm";
-
-		//String XML_STATES = TEST_SUITE_PATH + "/states.xml";
-		//String XML_EVENTABLES = TEST_SUITE_PATH + "/eventables.xml";
 
 		try {
 			DomUtils.directoryCheck(TEST_SUITE_PATH);
 			String fileName = null;
 
-			// the filename of the generated java test class, null otherwise
-			TestSuiteGeneratorHelper testSuiteGeneratorHelper = new TestSuiteGeneratorHelper(session);
-			List<TestMethod> testMethods = testSuiteGeneratorHelper.getTestMethods();
-
-			for (TestMethod t: testMethods){
-				System.out.println("t.getMethodName(): " + t.getMethodName());
-				for (TestMethodEvent tme: t.getEventList())
-				System.out.println("tme.getFormInputs(): " + tme.getFormInputs());
-			}
-
 			JavaTestGenerator generator =
 					new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(), testMethods);
-			//new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(),
-			//		testMethods, session.getConfig());
-
-			//testSuiteGeneratorHelper.writeStateVertexTestDataToXML(XML_STATES);
-			//testSuiteGeneratorHelper.writeEventableTestDataToXML(XML_EVENTABLES);
-			//generator.xmlSet(XML_STATES, XML_EVENTABLES);
 
 			fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
 

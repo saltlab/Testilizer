@@ -28,9 +28,10 @@ public class JavaTestGenerator {
 	/**
 	 * @param className
 	 * @param url
+	 * @param testMethods 
 	 * @throws Exception
 	 */
-	public JavaTestGenerator(String className, String url, List<TestMethod> testMethods) throws Exception {
+	public JavaTestGenerator(String className, String url, ArrayList<TestMethod> testMethods) throws Exception {
 
 	//public JavaTestGenerator(String className, String url, List<TestMethod> testMethods,
 	//      CrawljaxConfiguration configuration) throws Exception {
@@ -47,11 +48,10 @@ public class JavaTestGenerator {
 		context.put("date", new Date().toString());
 		context.put("classname", className);
 		context.put("url", url);
+		context.put("testMethods", testMethods);
 
 		//context.put("waitAfterEvent", crawlRules.getWaitAfterEvent());
 		//context.put("waitAfterReloadUrl", crawlRules.getWaitAfterReloadUrl());
-
-		context.put("methodList", testMethods);
 
 		//context.put("xmlstates", xmlStates);
 		//context.put("xmleventables", xmlEventables);
