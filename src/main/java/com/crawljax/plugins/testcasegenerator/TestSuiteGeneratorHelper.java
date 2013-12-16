@@ -28,8 +28,8 @@ public class TestSuiteGeneratorHelper {
 
 	public TestSuiteGeneratorHelper(CrawlSession session) {
 		this.session = session;
-		updateIdsForEventables();
-		updateIdsForStates();
+		//updateIdsForEventables();
+		//updateIdsForStates();
 	}
 
 	private void updateIdsForEventables() {
@@ -58,13 +58,13 @@ public class TestSuiteGeneratorHelper {
 		DomUtils.checkFolderForFile(fname);
 		LOGGER.info("Writing StateVertices test data to " + fname);
 		Map<Long, StateVertex> map = new HashMap<Long, StateVertex>();
-		int id = 1;
+		//int id = 1;
 		for (StateVertex stateVertex : states) {
-			stateVertex.setId(id);
+			//stateVertex.setId(id);
 			// Original StateVertex saveSateVertix = stateVertex.clone();
 			StateVertex saveSateVertix = stateVertex;
 			map.put(saveSateVertix.getId(), saveSateVertix);
-			id++;
+			//id++;
 		}
 		XMLObject.objectToXML(map, fname);
 	}
@@ -74,18 +74,18 @@ public class TestSuiteGeneratorHelper {
 		DomUtils.checkFolderForFile(fname);
 		LOGGER.info("Writing Eventables test data to " + fname);
 		Map<Long, Eventable> map = new HashMap<Long, Eventable>();
-		long id = 1;
+		//long id = 1;
 		for (Eventable eventable : eventables) {
-			eventable.setId(id);
+			//eventable.setId(id);
 			Eventable newEventable =
 			        new Eventable(eventable.getIdentification(), eventable.getEventType());
 			newEventable.setId(eventable.getId());
 			Element element = new Element(eventable.getElement().getNode());
-			newEventable.setId(id);
+			//newEventable.setId(id);
 			newEventable.setElement(element);
 
 			map.put(newEventable.getId(), newEventable);
-			id++;
+			//id++;
 		}
 		XMLObject.objectToXML(map, fname);
 	}
@@ -146,9 +146,10 @@ public class TestSuiteGeneratorHelper {
 
 						properties.put("name", formInput.getIdentification().getValue());
 						properties.put("type", formInput.getType());
-						properties.put("value", formInput.getInputValues().iterator().next()
-						        .getValue());
-						mapFormInputs.add(properties);
+						properties.put("value", formInput.getInputValues().iterator().next().getValue());
+						
+						if (!mapFormInputs.contains(properties))
+							mapFormInputs.add(properties);
 					}
 				}
 				methodEvent.setFormInputs(mapFormInputs);

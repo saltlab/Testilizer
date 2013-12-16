@@ -30,10 +30,13 @@ public class JavaTestGenerator {
 	 * @param url
 	 * @throws Exception
 	 */
-	public JavaTestGenerator(String className, String url, List<TestMethod> testMethods,
-	        CrawljaxConfiguration configuration) throws Exception {
-		CrawlRules crawlRules = configuration.getCrawlRules();
+	public JavaTestGenerator(String className, String url, List<TestMethod> testMethods) throws Exception {
 
+	//public JavaTestGenerator(String className, String url, List<TestMethod> testMethods,
+	//      CrawljaxConfiguration configuration) throws Exception {
+	//	CrawlRules crawlRules = configuration.getCrawlRules();
+
+		
 		engine = new VelocityEngine();
 		/* disable logging */
 		engine.setProperty(VelocityEngine.RUNTIME_LOG_LOGSYSTEM_CLASS, "org.apache.velocity.runtime.log.NullLogChute");
@@ -45,17 +48,18 @@ public class JavaTestGenerator {
 		context.put("classname", className);
 		context.put("url", url);
 
-		context.put("waitAfterEvent", crawlRules.getWaitAfterEvent());
-		context.put("waitAfterReloadUrl", crawlRules.getWaitAfterReloadUrl());
+		//context.put("waitAfterEvent", crawlRules.getWaitAfterEvent());
+		//context.put("waitAfterReloadUrl", crawlRules.getWaitAfterReloadUrl());
 
 		context.put("methodList", testMethods);
-		context.put("database", true);
+
+		//context.put("xmlstates", xmlStates);
+		//context.put("xmleventables", xmlEventables);
 	}
 
-	public void useXmlInSteadOfDB(String xmlStates, String xmlEventables) {
+	public void xmlSet(String xmlStates, String xmlEventables) {
 		context.put("xmlstates", xmlStates);
 		context.put("xmleventables", xmlEventables);
-		context.put("database", false);
 	}
 
 	/**

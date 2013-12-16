@@ -1,5 +1,8 @@
 package com.crawljax.plugins.testsuiteextension;
 
+import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
+import static org.junit.Assert.assertThat;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -10,7 +13,11 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.tools.Diagnostic;
@@ -27,6 +34,7 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 
 
+import org.jgrapht.GraphPath;
 import org.junit.runner.JUnitCore;
 import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
@@ -73,6 +81,7 @@ import com.crawljax.core.state.Identification.How;
 import com.crawljax.forms.FormInput;
 import com.crawljax.plugins.testcasegenerator.JavaTestGenerator;
 import com.crawljax.plugins.testcasegenerator.TestMethod;
+import com.crawljax.plugins.testcasegenerator.TestMethodEvent;
 import com.crawljax.plugins.testcasegenerator.TestSuiteGeneratorHelper;
 import com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor;
 import com.crawljax.util.AssertedElementPattern;
@@ -366,6 +375,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// generate corresponding Eventable for webElement
 							event = getCorrespondingEventable(webElement, EventType.click, browser);
 
+							System.out.println("event: " + event);
+							
 							/*String xpath = getXPath(webElement);
 							try {
 
@@ -379,8 +390,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 							
 							//System.out.println("setting form inputs with: " + relatedFormInputs);
-							
-							event.setRelatedFormInputs(relatedFormInputs);
+							CopyOnWriteArrayList<FormInput> relatedFormInputsCopy = new CopyOnWriteArrayList<FormInput>();
+							relatedFormInputsCopy.addAll(relatedFormInputs);
+
+							//event.setRelatedFormInputs(relatedFormInputs);
+							event.setRelatedFormInputs(relatedFormInputsCopy);
 
 							CopyOnWriteArrayList<FormInput> formInputsToCheck = event.getRelatedFormInputs();
 
@@ -417,7 +431,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							//webElement.click();
 
 							// clearing the relatedFormInputs and inputValues to be set for the next click
-							//relatedFormInputs.clear();
+							relatedFormInputs.clear();
 						}
 						break;
 					
@@ -851,7 +865,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		//regenerateAssertions(sfg);
 		
-		//generateTestSuite(session);
+		generateTestSuite(session);
 		
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
@@ -863,42 +877,119 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	private void generateTestSuite(CrawlSession session) {
 		StateFlowGraph sfg = session.getStateFlowGraph();
 		
+		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
+
+		Set<Eventable> uEvents = new HashSet<Eventable>();
+
+		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
+			System.out.println("List<GraphPath<StateVertex, Eventable>> paths : results");
+			for (GraphPath<StateVertex, Eventable> p : paths) {
+				System.out.println("GraphPath<StateVertex, Eventable> p : paths");
+				for (Eventable edge : p.getEdgeList()) {
+					
+					System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
+					System.out.println("//" + edge.toString());
+
+					if (edge.getRelatedFormInputs().size() > 0){
+						// First fill the inputs 
+						for (FormInput formInput : edge.getRelatedFormInputs()) {
+							if (formInput.getInputValues().iterator().hasNext()) {
+																
+								if (formInput.getType().toLowerCase().startsWith("text")
+								        || formInput.getType().equalsIgnoreCase("password")
+								        || formInput.getType().equalsIgnoreCase("hidden")) {
+									
+									//System.out.println("how: " + formInput.getIdentification().getHow().toString());
+									//System.out.println("name: " + formInput.getIdentification().getValue());
+									//System.out.println("type: " + formInput.getType());
+									//System.out.println("value: " + formInput.getInputValues().iterator().next().getValue());
+									
+									String seleniumAction1 = "driver.findElement(By." + formInput.getIdentification().getHow().toString() +
+											"(\"" + formInput.getIdentification().getValue() + "\")).clear();";
+									
+									String seleniumAction2 = "driver.findElement(By." + formInput.getIdentification().getHow().toString() +
+											"(\"" + formInput.getIdentification().getValue() + "\")).sendKeys(\"" + 
+											formInput.getInputValues().iterator().next().getValue() + "\");";
+									
+									System.out.println(seleniumAction1);
+									System.out.println(seleniumAction2);
+									
+								} else if (formInput.getType().equalsIgnoreCase("checkbox")) {
+								} else if (formInput.getType().equalsIgnoreCase("radio")) {
+								} else if (formInput.getType().startsWith("select")) {
+								}
+								
+							}
+						}
+					}
+
+					//System.out.println("how: " + edge.getIdentification().getHow().toString());
+					//System.out.println("value: " + edge.getIdentification().getValue());
+					//System.out.println("text: " + edge.getElement().getText().replaceAll("\"", "\\\\\"").trim());
+
+					String seleniumAction1 = "driver.findElement(By." + edge.getIdentification().getHow().toString() +
+							"(\"" + edge.getIdentification().getValue() + "\")).click();";
+					
+					System.out.println(seleniumAction1);
+
+					
+					if (edge.getTargetStateVertex().getAssertions().size()>0){
+						for (int i=0;i<edge.getTargetStateVertex().getAssertions().size();i++)
+							System.out.println(edge.getTargetStateVertex().getAssertions().get(i));
+					}
+
+					//System.out.println("edge: " + edge.toString());
+					//if (!uEvents.contains(edge)) {
+					//	uEvents.add(edge);
+					//}
+				}
+			}
+		}
+
+		
 		String TEST_SUITE_PATH = "src/test/java/generated";
 		String CLASS_NAME = "GeneratedTestCases";
 		String FILE_NAME_TEMPLATE = "TestCase.vm";
 
-		String XML_STATES = TEST_SUITE_PATH + "/states.xml";
-		String XML_EVENTABLES = TEST_SUITE_PATH + "/eventables.xml";
+		//String XML_STATES = TEST_SUITE_PATH + "/states.xml";
+		//String XML_EVENTABLES = TEST_SUITE_PATH + "/eventables.xml";
 
-			try {
-				DomUtils.directoryCheck(TEST_SUITE_PATH);
+		try {
+			DomUtils.directoryCheck(TEST_SUITE_PATH);
 			String fileName = null;
 
 			// the filename of the generated java test class, null otherwise
 			TestSuiteGeneratorHelper testSuiteGeneratorHelper = new TestSuiteGeneratorHelper(session);
 			List<TestMethod> testMethods = testSuiteGeneratorHelper.getTestMethods();
 
-				JavaTestGenerator generator =
-				        new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(),
-				                testMethods, session.getConfig());
-
-				testSuiteGeneratorHelper.writeStateVertexTestDataToXML(XML_STATES);
-				testSuiteGeneratorHelper.writeEventableTestDataToXML(XML_EVENTABLES);
-				generator.useXmlInSteadOfDB(XML_STATES, XML_EVENTABLES);
-
-				fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
-
-				System.out.println("Tests succesfully generated in " + fileName);		
-
-			} catch (IOException e) {
-				System.out.println("Error in checking " + TEST_SUITE_PATH);
-				e.printStackTrace();
-			} catch (Exception e) {
-				System.out.println("Error generating testsuite: " + e.getMessage());
-				e.printStackTrace();
+			for (TestMethod t: testMethods){
+				System.out.println("t.getMethodName(): " + t.getMethodName());
+				for (TestMethodEvent tme: t.getEventList())
+				System.out.println("tme.getFormInputs(): " + tme.getFormInputs());
 			}
-		
-		
+
+			JavaTestGenerator generator =
+					new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(), testMethods);
+			//new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(),
+			//		testMethods, session.getConfig());
+
+			//testSuiteGeneratorHelper.writeStateVertexTestDataToXML(XML_STATES);
+			//testSuiteGeneratorHelper.writeEventableTestDataToXML(XML_EVENTABLES);
+			//generator.xmlSet(XML_STATES, XML_EVENTABLES);
+
+			fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
+
+			System.out.println("Tests succesfully generated in " + fileName);		
+
+		} catch (IOException e) {
+			System.out.println("Error in checking " + TEST_SUITE_PATH);
+			e.printStackTrace();
+		} catch (Exception e) {
+			System.out.println("Error generating testsuite: " + e.getMessage());
+			e.printStackTrace();
+		}
+
+
 	}
 
 
