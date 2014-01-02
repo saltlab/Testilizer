@@ -79,9 +79,10 @@ import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.Eventable.EventType;
 import com.crawljax.core.state.Identification.How;
 import com.crawljax.forms.FormInput;
-import com.crawljax.plugins.testcasegenerator.JavaTestGenerator;
-import com.crawljax.plugins.testcasegenerator.TestMethod;
-import com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor;
+import com.crawljax.plugins.testsuiteextension.jsinstrumentor.JSModifyProxyPlugin;
+import com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor;
+import com.crawljax.plugins.testsuiteextension.testcasegenerator.JavaTestGenerator;
+import com.crawljax.plugins.testsuiteextension.testcasegenerator.TestMethod;
 import com.crawljax.util.AssertedElementPattern;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
@@ -1039,8 +1040,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		ArrayList<String> executedJSFunctions = new ArrayList<String>();
 		executedJSFunctions.clear();
 
-		// TODO: calculate code coverage for feedback-directed exploration
-		/*for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
+		// Calculating JS statement code coverage for feedback-directed exploration
+		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
 			try{
 				Object executedFunctions =  context.getBrowser().executeJavaScript("return " + modifiedJS + "_executed_functions;");
 				ArrayList tempList = (ArrayList) executedFunctions;
@@ -1052,7 +1053,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}catch (Exception e) {
 				LOG.info("Could not execute script: " + "return " + modifiedJS + "_executed_functions;");
 			}
-		}*/
+		}
 		
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
 	}

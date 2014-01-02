@@ -1,4 +1,4 @@
-package com.crawljax.plugins.testsuiteextension.instrumentor;
+package com.crawljax.plugins.testsuiteextension.seleniuminstrumentor;
 
 import japa.parser.ASTHelper;
 import japa.parser.JavaParser;
@@ -49,7 +49,7 @@ import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.crawljax.plugins.utils.CompilationUnitUtils;
+import com.crawljax.plugins.testsuiteextension.utils.CompilationUnitUtils;
 
 
 public class SeleniumInstrumentor {

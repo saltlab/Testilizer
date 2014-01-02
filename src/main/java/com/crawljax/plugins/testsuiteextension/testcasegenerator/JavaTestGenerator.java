@@ -1,4 +1,4 @@
-package com.crawljax.plugins.testcasegenerator;
+package com.crawljax.plugins.testsuiteextension.testcasegenerator;
 
 import java.io.File;
 import java.io.FileWriter;

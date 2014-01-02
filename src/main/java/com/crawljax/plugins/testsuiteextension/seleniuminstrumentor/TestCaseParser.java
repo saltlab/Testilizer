@@ -1,4 +1,4 @@
-package com.crawljax.plugins.testsuiteextension.instrumentor;
+package com.crawljax.plugins.testsuiteextension.seleniuminstrumentor;
 
 import japa.parser.JavaParser;
 import japa.parser.ParseException;
@@ -16,8 +16,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
-import com.crawljax.plugins.utils.CompilationUnitUtils;
-import com.crawljax.plugins.utils.MethodCallVisitor;
+import com.crawljax.plugins.testsuiteextension.utils.CompilationUnitUtils;
+import com.crawljax.plugins.testsuiteextension.utils.MethodCallVisitor;
 
 
 public class TestCaseParser {
