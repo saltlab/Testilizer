@@ -3,6 +3,7 @@ package com.crawljax.plugins.testsuiteextension;
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.junit.Assert.assertThat;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -107,6 +109,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private boolean inAssertionMode = false;
 	
+	// Keeping track of executed lines of a JavaScript code for Feedex	
+	private Map<String,ArrayList<Integer>> JSCountList = new Hashtable<String,ArrayList<Integer>>(); 
 	
 	public TestSuiteExtension() {
 		// TODO: initialization
@@ -1034,26 +1038,51 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 * After a successful event firing, calculate the code coverage
 	 */
 	@Override
-	public void onFireEvent(CrawlerContext context, StateVertex stateBefore,
-			Eventable eventable, StateVertex stateAfter) {
-
-		ArrayList<String> executedJSFunctions = new ArrayList<String>();
-		executedJSFunctions.clear();
+	public void onFireEvent(CrawlerContext context, StateVertex stateBefore, Eventable eventable, StateVertex stateAfter) {
 
 		// Calculating JS statement code coverage for feedback-directed exploration
 		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
+			//System.out.println("MODIFIED CODES ARE: " + modifiedJS);
 			try{
-				Object executedFunctions =  context.getBrowser().executeJavaScript("return " + modifiedJS + "_executed_functions;");
-				ArrayList tempList = (ArrayList) executedFunctions;
-				LOG.info("JS functions " + tempList + " were executed after firing the eventable " + eventable);
-				for (int i=0; i<tempList.size(); i++){
-					if (!((String)tempList.get(i)).equals(""))
-						executedJSFunctions.add((String)tempList.get(i));
-				}
+				Object counter =  this.browser.executeJavaScript("return " + modifiedJS + "_exec_counter;");
+				this.controller.setCountList(modifiedJS, counter);
 			}catch (Exception e) {
-				LOG.info("Could not execute script: " + "return " + modifiedJS + "_executed_functions;");
+				LOG.info("Could not execute script");
 			}
 		}
+		
+		double coverage = 0.0;
+
+		try {
+			int totalExecutedLines = 0, totalLines = 0;
+
+			for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
+				if (JSCountList.containsKey(modifiedJS)){
+					totalLines += JSCountList.get(modifiedJS).size();
+					int executedLines = 0;
+
+					LOG.info(" List of " + modifiedJS + " is: " + JSCountList.get(modifiedJS));
+
+					for (int i: JSCountList.get(modifiedJS))
+						if (i>0){
+							totalExecutedLines++;
+							executedLines++;
+						}
+
+					LOG.info("List of " + modifiedJS + " # lines ececuted: " + executedLines + " # tolal lines: " + JSCountList.get(modifiedJS).size() + " - code coverage: " + (double)executedLines/(double)JSCountList.get(modifiedJS).size()*100+"%\n");
+				}
+			}
+
+			coverage = (double)totalExecutedLines/(double)totalLines;
+
+			LOG.info("code coverage: " + coverage*100+"%");
+
+		}catch(Exception e){
+			LOG.info("IO exception!");
+			e.printStackTrace();
+		}
+
+		context.getSession().getStateFlowGraph().setLatestCoverage(coverage);
 		
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
 	}
@@ -1066,8 +1095,47 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
-		// TODO: check the assertions from test suite
+		
+		// Calculate initial code coverage for the index page to be used by Feedex
+		if (vertex.getId() == vertex.INDEX_ID){
+			for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
+				// LOGGER.info("** MODIFIEDS ARE: " + modifiedJS);
+				try{
+					Object counter =  this.browser.executeJavaScript("return " + modifiedJS + "_exec_counter;");
+					ArrayList countList = (ArrayList) counter;
+
+					this.controller.setCountList(modifiedJS, counter);
+				}catch (Exception e) {
+					LOG.info("Could not execute script");
+				}
+			}
+			double cov = this.controller.getCoverage(false);
+			context.getSession().getStateFlowGraph().setInitialCoverage(vertex, cov);
+		}
+
 	}
+	
+
+	// Amin: keeping track of executed lines of a js	
+	public void setCountList(String modifiedJS, Object counter){
+		ArrayList<Integer> countList = new ArrayList<Integer>();
+		ArrayList c = (ArrayList) counter;
+		countList.clear(); // used as a temp list to be added to JSCountList
+
+		if (!JSCountList.containsKey(modifiedJS)){ // if not exist add new js to the JSCountList	
+			for (int i=0;i<c.size();i++)
+				countList.add(((Long)c.get(i)).intValue());
+			JSCountList.put(modifiedJS, countList);
+		}else{ // update JSCountList
+			for (int i: JSCountList.get(modifiedJS))
+				countList.add(i);
+			for (int i=0;i<c.size();i++)
+				countList.set(i,countList.get(i)+((Long)c.get(i)).intValue());
+			JSCountList.put(modifiedJS, countList);
+		}
+	}
+
+	
 
 	@Override
 	public void onRevisitState(CrawlerContext context, StateVertex currentState) {
