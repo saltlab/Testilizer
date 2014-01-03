@@ -1,9 +1,7 @@
 package com.crawljax.plugins.testsuiteextension;
 
-import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.junit.Assert.assertThat;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -14,12 +12,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.tools.Diagnostic;
@@ -29,8 +24,6 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 import javax.xml.xpath.XPathFactory;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
@@ -39,20 +32,11 @@ import javax.xml.xpath.XPathExpressionException;
 import org.jgrapht.GraphPath;
 import org.junit.runner.JUnitCore;
 import org.openqa.selenium.By;
-import org.openqa.selenium.SearchContext;
-import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.internal.FindsByClassName;
-import org.openqa.selenium.internal.FindsByCssSelector;
-import org.openqa.selenium.internal.FindsByLinkText;
-import org.openqa.selenium.internal.FindsByName;
-import org.openqa.selenium.internal.FindsByTagName;
-import org.openqa.selenium.internal.FindsByXPath;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 
@@ -61,16 +45,13 @@ import com.crawljax.core.CandidateElement;
 import com.crawljax.core.CrawlSession;
 import com.crawljax.core.CrawlTaskConsumer;
 import com.crawljax.core.CrawlerContext;
-import com.crawljax.core.CrawljaxException;
 import com.crawljax.core.ExitNotifier.ExitStatus;
-import com.crawljax.core.configuration.CrawlElement;
 import com.crawljax.core.configuration.CrawljaxConfiguration;
 import com.crawljax.core.plugin.ExecuteInitialPathsPlugin;
 import com.crawljax.core.plugin.OnFireEventSucceededPlugin;
 import com.crawljax.core.plugin.OnNewStatePlugin;
 import com.crawljax.core.plugin.OnRevisitStatePlugin;
 import com.crawljax.core.plugin.OnUrlLoadPlugin;
-import com.crawljax.core.plugin.Plugin;
 import com.crawljax.core.plugin.PostCrawlingPlugin;
 import com.crawljax.core.plugin.PreCrawlingPlugin;
 import com.crawljax.core.plugin.PreStateCrawlingPlugin;
@@ -90,7 +71,6 @@ import com.crawljax.util.AssertedElementPattern;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.util.DomUtils;
 import com.crawljax.util.XPathHelper;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 /**
@@ -1045,43 +1025,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			//System.out.println("MODIFIED CODES ARE: " + modifiedJS);
 			try{
 				Object counter =  this.browser.executeJavaScript("return " + modifiedJS + "_exec_counter;");
-				this.controller.setCountList(modifiedJS, counter);
+				setCountList(modifiedJS, counter);
 			}catch (Exception e) {
 				LOG.info("Could not execute script");
 			}
 		}
-		
-		double coverage = 0.0;
-
-		try {
-			int totalExecutedLines = 0, totalLines = 0;
-
-			for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
-				if (JSCountList.containsKey(modifiedJS)){
-					totalLines += JSCountList.get(modifiedJS).size();
-					int executedLines = 0;
-
-					LOG.info(" List of " + modifiedJS + " is: " + JSCountList.get(modifiedJS));
-
-					for (int i: JSCountList.get(modifiedJS))
-						if (i>0){
-							totalExecutedLines++;
-							executedLines++;
-						}
-
-					LOG.info("List of " + modifiedJS + " # lines ececuted: " + executedLines + " # tolal lines: " + JSCountList.get(modifiedJS).size() + " - code coverage: " + (double)executedLines/(double)JSCountList.get(modifiedJS).size()*100+"%\n");
-				}
-			}
-
-			coverage = (double)totalExecutedLines/(double)totalLines;
-
-			LOG.info("code coverage: " + coverage*100+"%");
-
-		}catch(Exception e){
-			LOG.info("IO exception!");
-			e.printStackTrace();
-		}
-
+		double coverage = getCoverage();;
 		context.getSession().getStateFlowGraph().setLatestCoverage(coverage);
 		
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
@@ -1104,19 +1053,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					Object counter =  this.browser.executeJavaScript("return " + modifiedJS + "_exec_counter;");
 					ArrayList countList = (ArrayList) counter;
 
-					this.controller.setCountList(modifiedJS, counter);
+					setCountList(modifiedJS, counter);
 				}catch (Exception e) {
-					LOG.info("Could not execute script");
+					LOG.info("Could not execute script: return " + modifiedJS + "_exec_counter;");
 				}
 			}
-			double cov = this.controller.getCoverage(false);
-			context.getSession().getStateFlowGraph().setInitialCoverage(vertex, cov);
+			double coverage = getCoverage();
+			context.getSession().getStateFlowGraph().setInitialCoverage(vertex, coverage);
 		}
 
 	}
 	
 
-	// Amin: keeping track of executed lines of a js	
+	// Keeping track of executed lines of a js which will be used to calcualte coverage	
 	public void setCountList(String modifiedJS, Object counter){
 		ArrayList<Integer> countList = new ArrayList<Integer>();
 		ArrayList c = (ArrayList) counter;
@@ -1135,7 +1084,36 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 	}
 
-	
+
+	// Compute code coverage
+	public double getCoverage(){
+
+		double coverage = 0.0;
+		int totalExecutedLines = 0, totalLines = 0;
+
+		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
+			if (JSCountList.containsKey(modifiedJS)){
+				totalLines += JSCountList.get(modifiedJS).size();
+				int executedLines = 0;
+
+				LOG.info(" List of " + modifiedJS + " is: " + JSCountList.get(modifiedJS));
+
+				for (int i: JSCountList.get(modifiedJS))
+					if (i>0){
+						totalExecutedLines++;
+						executedLines++;
+					}
+
+				LOG.info("List of " + modifiedJS + " # lines ececuted: " + executedLines + " # tolal lines: " + JSCountList.get(modifiedJS).size() + " - code coverage: " + (double)executedLines/(double)JSCountList.get(modifiedJS).size()*100+"%\n");
+			}
+		}
+
+		coverage = (double)totalExecutedLines/(double)totalLines;
+
+		LOG.info("Code coverage: " + coverage*100+"%");
+		return coverage;
+	}
+
 
 	@Override
 	public void onRevisitState(CrawlerContext context, StateVertex currentState) {
