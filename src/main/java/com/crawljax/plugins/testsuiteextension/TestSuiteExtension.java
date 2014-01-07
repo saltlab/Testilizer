@@ -1,6 +1,7 @@
 package com.crawljax.plugins.testsuiteextension;
 
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -257,6 +258,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		How how = null;
 		String howValue = null;
+		String assertedElementLocator = null;
 
 		for (String st: trace){
 			// read the value such as id, cssSelector, xpath, and etc. 
@@ -424,34 +426,42 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						
 					case "By.id:":
 						howValue = methodValue.get(1);
+						assertedElementLocator = "By.id(\"" + howValue +"\")";
 						webElement = browser.getBrowser().findElement(By.id(howValue));
 						break;
 					case "By.linkText:":
 						howValue = methodValue.get(1);
+						assertedElementLocator = "By.linkText(\"" + howValue +"\")";
 						webElement = browser.getBrowser().findElement(By.linkText(howValue));
 						break;
 					case "By.partialLinkText:":
 						howValue = methodValue.get(1);
+						assertedElementLocator = "By.partialLinkText(\"" + howValue +"\")";
 						webElement = browser.getBrowser().findElement(By.partialLinkText(howValue));
 						break;
 					case "By.name:":
 						howValue = methodValue.get(1);
+						assertedElementLocator = "By.name(\"" + howValue +"\")";
 						webElement = browser.getBrowser().findElement(By.name(howValue));
 						break;
 					case "By.tagName:":
 						howValue = methodValue.get(1);
+						assertedElementLocator = "By.tagName(\"" + howValue +"\")";
 						webElement = browser.getBrowser().findElement(By.tagName(howValue));
 						break;
 					case "By.xpath:":
 						howValue = methodValue.get(1);
+						assertedElementLocator = "By.xpath(\"" + howValue +"\")";
 						webElement = browser.getBrowser().findElement(By.xpath(howValue));
 						break;
 					case "By.className:":
 						howValue = methodValue.get(1);
+						assertedElementLocator = "By.className(\"" + howValue +"\")";
 						webElement = browser.getBrowser().findElement(By.className(howValue));
 						break;
 					case "By.selector:":
 						howValue = methodValue.get(1);
+						assertedElementLocator = "By.cssSelector(\"" + howValue +"\")";
 						webElement = browser.getBrowser().findElement(By.cssSelector(howValue));
 						System.out.println("Found webElement: " + webElement);
 						break;
@@ -479,7 +489,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							}
 						}
 
-						AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion);
+						AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, assertedElementLocator);
 						assertedElementPatterns.add(aep);
 						//System.out.println(aep);
 						// adding assertion to the current DOM state in the SFG
@@ -717,7 +727,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		try {
 			dom = DomUtils.asDocument(browser.getStrippedDomWithoutIframeContent());
 	        XPath xPath = XPathFactory.newInstance().newXPath();
-	        // this works gets the value of the node
 	        //System.out.println("value is " + xPath.evaluate(xpathToRetrieve, dom));
 			element = (org.w3c.dom.Element) xPath.evaluate(xpathToRetrieve, dom, XPathConstants.NODE);
 			//System.out.println("element.getNodeName(): " + element.getNodeName());
@@ -769,7 +778,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		StateFlowGraph sfg = session.getStateFlowGraph();
 		for (StateVertex s: sfg.getAllStates()){
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
-			System.out.println("There are " + s.getAssertions().size() + " asserted element paterns in state " + s.getName() + " before regeneration.");
+			System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before regeneration.");
 			if (s.getAssertions().size()>0){
 				for (int i=0;i<s.getAssertions().size();i++)
 					System.out.println(s.getAssertions().get(i));
@@ -785,41 +794,66 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						for (int i = 0; i < nodeList.getLength(); i++){
 							element = (org.w3c.dom.Element) nodeList.item(i);
 
-							AssertedElementPattern aepTemp = new AssertedElementPattern(element, ""); // creating an AssertedElementPattern without any assertion text
+							AssertedElementPattern aepTemp = new AssertedElementPattern(element, "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
 							String howMatched = aep.getHowPatternMatch(aepTemp);
+							AssertedElementPattern newaep = null; // to be used if an AssertedElementPattern should be generated
+									
+							//aep.getAssertionType();
+							
 							switch (howMatched){
 							case "PatternFullTextMatch":
 								System.out.println(aep);
 								System.out.println("PatternFullTextMatch");
 								System.out.println(aepTemp);
-								s.addAssertedElementPattern(aep);
+								s.addAssertedElementPattern(aep); // reuse the same AssertedElementPattern
+								
+								// also add pattern check assertion
+								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
+								
 								break;
 							case "PatternFullMatch":
-								//System.out.println(aep);
-								//System.out.println("PatternFullMatch");
-								//System.out.println(aepTemp);
-								//s.addAssertedElementPattern(aep);
+								System.out.println(aep);
+								System.out.println("PatternFullMatch");
+								System.out.println(aepTemp);
+								newaep = regenerateAssertion(aep, howMatched);
+								if (newaep != null)
+									s.addAssertedElementPattern(newaep);
+
+								// also add pattern check assertion
+								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
+
 								break;
 							case "PatternTagMatch":
-								//System.out.println(aep);
-								//System.out.println("PatternTagMatch");
-								//System.out.println(aepTemp);
-								//s.addAssertedElementPattern(aep);
+								System.out.println(aep);
+								System.out.println("PatternTagMatch");
+								System.out.println(aepTemp);
+								newaep = regenerateAssertion(aep, howMatched);
+								if (newaep != null)
+									s.addAssertedElementPattern(newaep);
+
+								// also add pattern check assertion
+								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
+
 								break;
 							case "ElementFullTextMatch":
-								//System.out.println(aep);
-								//System.out.println("ElementFullTextMatch");
-								//System.out.println(aepTemp);
+								System.out.println(aep);
+								System.out.println("ElementFullTextMatch");
+								System.out.println(aepTemp);
+								s.addAssertedElementPattern(aep); // reuse the same AssertedElementPattern
 								break;
 							case "ElementFullMatch":
-								//System.out.println(aep);
-								//System.out.println("ElementFullMatch");
-								//System.out.println(aepTemp);
+								System.out.println(aep);
+								System.out.println("ElementFullMatch");
+								newaep = regenerateAssertion(aep, howMatched);
+								if (newaep != null)
+									s.addAssertedElementPattern(newaep);
 								break;
 							case "ElementTagMatch":
-								//System.out.println(aep);
-								//System.out.println("ElementTagMatch");
-								//System.out.println(aepTemp);
+								System.out.println(aep);
+								System.out.println("ElementTagMatch");
+								newaep = regenerateAssertion(aep, howMatched);
+								if (newaep != null)
+									s.addAssertedElementPattern(newaep);
 								break;
 							}
 						}
@@ -840,20 +874,66 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				}*/
 			}
 			
-			System.out.println("There are " + s.getAssertions().size() + " asserted element paterns in state " + s.getName() + " after regeneration.");
+			System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after regeneration.");
 			if (s.getAssertions().size()>0){
 				for (int i=0;i<s.getAssertions().size();i++)
 					System.out.println(s.getAssertions().get(i));
 			}
 			
 		}
-
-		//regenerateAssertions(sfg);
 		
 		generateTestSuite(session);
 		
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
+
+	private AssertedElementPattern generatePatternAssertion(AssertedElementPattern aep) {
+		String elementTag = aep.getTagName();
+		String parentTag =  aep.getParentTagName();
+		ArrayList<String> childrenTags = new ArrayList<String>(aep.getChildrenTagName());
+		String patternCheckAssertion = "assertTrue(isElementPatternPresent(" + parentTag + "," + elementTag + ", new ArrayList<String>(Arrays.asList("; 
+		for (int j=0; j < childrenTags.size()-1; j++)
+			patternCheckAssertion += childrenTags.get(j) + ",";
+		patternCheckAssertion += childrenTags.get(childrenTags.size()-1) + "));";
+		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
+		return aepMatch;
+	}
+
+
+	private AssertedElementPattern regenerateAssertion(AssertedElementPattern aep, String howMatched) {
+		// Regenerating an AssertedElementPattern based on the matching result
+		AssertedElementPattern newaep = new AssertedElementPattern(aep.getSourceElement(), "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
+		
+		switch (howMatched){
+		case "PatternFullMatch":
+			if (newaep.getAssertedElementLocator().toUpperCase().contains("BODY"))
+				return null;
+			newaep.setAssertion("assertTrue(isElementPresent("+ newaep.getAssertedElementLocator() +"))");
+			System.out.println(newaep);
+			break;
+		case "PatternTagMatch":
+			if (newaep.getTagName().toUpperCase().equals("BODY"))
+				return null;
+			newaep.setAssertion("assertTrue(isElementPresent(By.tagName(\"" + newaep.getTagName() +"\")))");
+			System.out.println(newaep);
+			break;
+		case "ElementFullMatch":
+			if (newaep.getAssertedElementLocator().toUpperCase().contains("BODY"))
+				return null;
+			newaep.setAssertion("assertTrue(isElementPresent("+ newaep.getAssertedElementLocator() +"))");
+			System.out.println(newaep);
+			break;
+		case "ElementTagMatch":
+			if (newaep.getTagName().toUpperCase().equals("BODY"))
+				return null;			
+			newaep.setAssertion("assertTrue(isElementPresent(By.tagName(\"" + newaep.getTagName() +"\")))");
+			System.out.println(newaep);
+			break;
+		}
+		
+		return newaep;
+	}
+
 
 	/**
 	 * Generating the extended test suite
@@ -908,8 +988,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 									testMethod.addStatement(seleniumAction1);
 									testMethod.addStatement(seleniumAction2);
 
-									System.out.println(seleniumAction1);
-									System.out.println(seleniumAction2);
+									//System.out.println(seleniumAction1);
+									//System.out.println(seleniumAction2);
 									
 								} else if (formInput.getType().equalsIgnoreCase("checkbox")) {
 								} else if (formInput.getType().equalsIgnoreCase("radio")) {
@@ -927,13 +1007,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					String seleniumAction3 = "driver.findElement(By." + edge.getIdentification().getHow().toString() +
 							"(\"" + edge.getIdentification().getValue() + "\")).click();";
 					
-					System.out.println(seleniumAction3);
+					//System.out.println(seleniumAction3);
+					
 					testMethod.addStatement(seleniumAction3);
 
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
 						for (int i=0;i<edge.getTargetStateVertex().getAssertions().size();i++){
-							System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
+							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
 							testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + ";");
 						}
 					}
@@ -970,40 +1051,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	}
 
-
-	private void regenerateAssertions(StateFlowGraph sfg) {
-		ArrayList<AssertedElementPattern> assertedElementPatterns1 = new ArrayList<AssertedElementPattern>();
-		ArrayList<AssertedElementPattern> assertedElementPatterns2 = new ArrayList<AssertedElementPattern>();
-		
-		System.out.println("*** Regenerating Assertions ***");
-		for (StateVertex s1: sfg.getAllStates()){
-			for (StateVertex s2: sfg.getAllStates()){
-				if (s1.getId()!=s2.getId()){
-					assertedElementPatterns1 = s1.getAssertedElementPatters();
-					assertedElementPatterns2 = s2.getAssertedElementPatters();
-					for (AssertedElementPattern aep1: assertedElementPatterns1)
-						if (foundPatterninDOM(aep1, s2.getDom())){
-							s2.addAssertedElementPattern(aep1);
-						}
-					for (AssertedElementPattern aep2: assertedElementPatterns2)
-						if (foundPatterninDOM(aep2, s1.getDom())){
-							s1.addAssertedElementPattern(aep2);
-						}					
-				}
-				
-			}
-		}
-		
-	}
 	
-
-
-	private boolean foundPatterninDOM(AssertedElementPattern aep1, String dom) {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-
 	@Override
 	public String toString() {
 		return "TestSuiteExtension plugin";
