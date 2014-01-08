@@ -62,7 +62,9 @@ import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.Eventable.EventType;
 import com.crawljax.core.state.Identification.How;
+import com.crawljax.forms.FormHandler;
 import com.crawljax.forms.FormInput;
+import com.crawljax.forms.RandomInputValueGenerator;
 import com.crawljax.plugins.testsuiteextension.jsinstrumentor.JSModifyProxyPlugin;
 import com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor;
 import com.crawljax.plugins.testsuiteextension.testcasegenerator.JavaTestGenerator;
@@ -349,6 +351,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						// storing input values for an element to be clicked later
 						String inputValue = methodValue.get(1);
 
+						// dealing with random input data
+						if (inputValue.equals("$RandValue")){
+							inputValue = new RandomInputValueGenerator().getRandomString(5);
+							System.out.println("Random string " + inputValue + " generated for inputValue");
+						}
+							
+						
 						// setting form input values for the Eventable
 						//System.out.println("adding " + inputValue + " to inputs");
 						relatedFormInputs.add(new FormInput(webElement.getTagName() , new Identification(how, howValue), inputValue));
@@ -505,6 +514,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
+		LOG.info("#states in the SFG after generating happy paths is " + firstConsumer.getContext().getSession().getStateFlowGraph().getNumberOfStates());	
 		
 		CrawlSession session = firstConsumer.getContext().getSession();
 		
