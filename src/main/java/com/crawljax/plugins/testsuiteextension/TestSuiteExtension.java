@@ -391,7 +391,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							firstConsumer.getCrawler().waitForRefreshTagIfAny(event);
 
 							// get number of states before firing events to check later if new a state is added
-							// No need for this part. New assertions will be regenerated after the crawling process is finished
+							// No need for this part. New assertions will be generated after the crawling process is finished
 							// int prevNumOfStates = firstConsumer.getCrawler().getContext().getSession().getStateFlowGraph().getNumberOfStates();
 							
 							boolean fired = firstConsumer.getCrawler().fireEvent(event);
@@ -489,7 +489,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							}
 						}
 
+						// to distinguish original assertions from reused/generated ones
 						AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, assertedElementLocator);
+						aep.setAssertionOrigin("original assertion");
 						assertedElementPatterns.add(aep);
 						//System.out.println(aep);
 						// adding assertion to the current DOM state in the SFG
@@ -778,7 +780,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		StateFlowGraph sfg = session.getStateFlowGraph();
 		for (StateVertex s: sfg.getAllStates()){
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
-			System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before regeneration.");
+			System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
 			if (s.getAssertions().size()>0){
 				for (int i=0;i<s.getAssertions().size();i++)
 					System.out.println(s.getAssertions().get(i));
@@ -796,7 +798,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 							AssertedElementPattern aepTemp = new AssertedElementPattern(element, "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
 							String howMatched = aep.getHowPatternMatch(aepTemp);
-							AssertedElementPattern newaep = null; // to be used if an AssertedElementPattern should be generated
 									
 							//aep.getAssertionType();
 							
@@ -805,7 +806,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								System.out.println(aep);
 								System.out.println("PatternFullTextMatch");
 								System.out.println(aepTemp);
-								s.addAssertedElementPattern(aep); // reuse the same AssertedElementPattern
+								aepTemp.setAssertion(aep.getAssertion());
+								aepTemp.setAssertionOrigin("reused assertion");
+								s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
 								
 								// also add pattern check assertion
 								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
@@ -815,9 +818,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								System.out.println(aep);
 								System.out.println("PatternFullMatch");
 								System.out.println(aepTemp);
-								newaep = regenerateAssertion(aep, howMatched);
-								if (newaep != null)
-									s.addAssertedElementPattern(newaep);
+								s.addAssertedElementPattern(generateAssertion(aep, howMatched));
 
 								// also add pattern check assertion
 								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
@@ -827,9 +828,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								System.out.println(aep);
 								System.out.println("PatternTagMatch");
 								System.out.println(aepTemp);
-								newaep = regenerateAssertion(aep, howMatched);
-								if (newaep != null)
-									s.addAssertedElementPattern(newaep);
+								s.addAssertedElementPattern(generateAssertion(aep, howMatched));
 
 								// also add pattern check assertion
 								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
@@ -839,21 +838,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								System.out.println(aep);
 								System.out.println("ElementFullTextMatch");
 								System.out.println(aepTemp);
-								s.addAssertedElementPattern(aep); // reuse the same AssertedElementPattern
+								aepTemp.setAssertion(aep.getAssertion());
+								aepTemp.setAssertionOrigin("reused assertion");
+								s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
 								break;
 							case "ElementFullMatch":
 								System.out.println(aep);
 								System.out.println("ElementFullMatch");
-								newaep = regenerateAssertion(aep, howMatched);
-								if (newaep != null)
-									s.addAssertedElementPattern(newaep);
+								s.addAssertedElementPattern(generateAssertion(aep, howMatched));
 								break;
 							case "ElementTagMatch":
 								System.out.println(aep);
 								System.out.println("ElementTagMatch");
-								newaep = regenerateAssertion(aep, howMatched);
-								if (newaep != null)
-									s.addAssertedElementPattern(newaep);
+								s.addAssertedElementPattern(generateAssertion(aep, howMatched));
 								break;
 							}
 						}
@@ -874,7 +871,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				}*/
 			}
 			
-			System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after regeneration.");
+			System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after generation.");
 			if (s.getAssertions().size()>0){
 				for (int i=0;i<s.getAssertions().size();i++)
 					System.out.println(s.getAssertions().get(i));
@@ -888,20 +885,24 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 	private AssertedElementPattern generatePatternAssertion(AssertedElementPattern aep) {
+		if (aep.getTagName().toUpperCase().equals("BODY"))
+			return null;	
 		String elementTag = aep.getTagName();
 		String parentTag =  aep.getParentTagName();
 		ArrayList<String> childrenTags = new ArrayList<String>(aep.getChildrenTagName());
-		String patternCheckAssertion = "assertTrue(isElementPatternPresent(" + parentTag + "," + elementTag + ", new ArrayList<String>(Arrays.asList("; 
+		String patternCheckAssertion = "assertTrue(isElementPatternPresent(\"" + parentTag + "\",\"" + elementTag + "\", new ArrayList<String>(Arrays.asList(\""; 
 		for (int j=0; j < childrenTags.size()-1; j++)
-			patternCheckAssertion += childrenTags.get(j) + ",";
-		patternCheckAssertion += childrenTags.get(childrenTags.size()-1) + "));";
+			patternCheckAssertion += childrenTags.get(j) + "\",\"";
+		patternCheckAssertion += childrenTags.get(childrenTags.size()-1) + "\"))))";
 		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
+		aepMatch.setAssertionOrigin("generated assertion");
+		System.out.println(aepMatch);
 		return aepMatch;
 	}
 
 
-	private AssertedElementPattern regenerateAssertion(AssertedElementPattern aep, String howMatched) {
-		// Regenerating an AssertedElementPattern based on the matching result
+	private AssertedElementPattern generateAssertion(AssertedElementPattern aep, String howMatched) {
+		// generating an AssertedElementPattern based on the matching result
 		AssertedElementPattern newaep = new AssertedElementPattern(aep.getSourceElement(), "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
 		
 		switch (howMatched){
@@ -930,7 +931,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			System.out.println(newaep);
 			break;
 		}
-		
+		newaep.setAssertionOrigin("generated assertion");
 		return newaep;
 	}
 
@@ -1013,9 +1014,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
-						for (int i=0;i<edge.getTargetStateVertex().getAssertions().size();i++){
+						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
 							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
-							testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + ";");
+							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
+							testMethod.addStatement(edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion() + "; // " 
+									+ edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin());
 						}
 					}
 
