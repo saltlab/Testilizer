@@ -807,43 +807,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							element = (org.w3c.dom.Element) nodeList.item(i);
 
 							AssertedElementPattern aepTemp = new AssertedElementPattern(element, "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
-							String howMatched = aep.getHowPatternMatch(aepTemp);
+							String howElementMatched = aep.getHowElementMatch(aepTemp);
+							String howPatternMatched = aep.getHowPatternMatch(aepTemp);
 									
 							//aep.getAssertionType();
 							
-							switch (howMatched){
-							case "PatternFullTextMatch":
-								System.out.println(aep);
-								System.out.println("PatternFullTextMatch");
-								System.out.println(aepTemp);
-								aepTemp.setAssertion(aep.getAssertion());
-								aepTemp.setAssertionOrigin("reused assertion");
-								s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
-								
-								// also add pattern check assertion
-								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
-								
-								break;
-							case "PatternFullMatch":
-								System.out.println(aep);
-								System.out.println("PatternFullMatch");
-								System.out.println(aepTemp);
-								s.addAssertedElementPattern(generateAssertion(aep, howMatched));
-
-								// also add pattern check assertion
-								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
-
-								break;
-							case "PatternTagMatch":
-								System.out.println(aep);
-								System.out.println("PatternTagMatch");
-								System.out.println(aepTemp);
-								s.addAssertedElementPattern(generateAssertion(aep, howMatched));
-
-								// also add pattern check assertion
-								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
-
-								break;
+							// Asserted Element Level Assertion
+							switch (howElementMatched){
 							case "ElementFullTextMatch":
 								System.out.println(aep);
 								System.out.println("ElementFullTextMatch");
@@ -855,14 +825,37 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							case "ElementFullMatch":
 								System.out.println(aep);
 								System.out.println("ElementFullMatch");
-								s.addAssertedElementPattern(generateAssertion(aep, howMatched));
+								s.addAssertedElementPattern(generateAssertion(aep, howElementMatched));
 								break;
 							case "ElementTagMatch":
 								System.out.println(aep);
 								System.out.println("ElementTagMatch");
-								s.addAssertedElementPattern(generateAssertion(aep, howMatched));
+								s.addAssertedElementPattern(generateAssertion(aep, howElementMatched));
 								break;
 							}
+							
+							// Asserted Element Pattern Level Assertion
+							switch (howPatternMatched){
+							case "PatternFullTextMatch":
+								System.out.println(aep);
+								System.out.println("PatternFullTextMatch");
+								// add pattern check assertion
+								s.addAssertedElementPattern(generatePatternAssertion(aep));
+								break;
+							case "PatternFullMatch":
+								System.out.println(aep);
+								System.out.println("PatternFullMatch");
+								// add pattern check assertion
+								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
+								break;
+							case "PatternTagMatch":
+								System.out.println(aep);
+								System.out.println("PatternTagMatch");
+								// add pattern check assertion
+								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
+								break;
+							}
+
 						}
 					} catch (IOException e) {
 						e.printStackTrace();
@@ -916,18 +909,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		AssertedElementPattern newaep = new AssertedElementPattern(aep.getSourceElement(), "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
 		
 		switch (howMatched){
-		case "PatternFullMatch":
-			if (newaep.getAssertedElementLocator().toUpperCase().contains("BODY"))
-				return null;
-			newaep.setAssertion("assertTrue(isElementPresent("+ newaep.getAssertedElementLocator() +"))");
-			System.out.println(newaep);
-			break;
-		case "PatternTagMatch":
-			if (newaep.getTagName().toUpperCase().equals("BODY"))
-				return null;
-			newaep.setAssertion("assertTrue(isElementPresent(By.tagName(\"" + newaep.getTagName() +"\")))");
-			System.out.println(newaep);
-			break;
 		case "ElementFullMatch":
 			if (newaep.getAssertedElementLocator().toUpperCase().contains("BODY"))
 				return null;
