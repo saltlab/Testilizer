@@ -1022,6 +1022,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					
 					testMethod.addStatement(seleniumAction3);
 
+					//adding DOM-mutator to be used for mutation testing of generated assertions
+					testMethod.addStatement("mutateDOMTree();");
+					
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
 						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
