@@ -825,12 +825,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							case "ElementFullMatch":
 								System.out.println(aep);
 								System.out.println("ElementFullMatch");
-								s.addAssertedElementPattern(generateAssertion(aep, howElementMatched));
+								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
 								break;
 							case "ElementTagMatch":
 								System.out.println(aep);
 								System.out.println("ElementTagMatch");
-								s.addAssertedElementPattern(generateAssertion(aep, howElementMatched));
+								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
 								break;
 							}
 							
@@ -839,20 +839,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							case "PatternFullTextMatch":
 								System.out.println(aep);
 								System.out.println("PatternFullTextMatch");
-								// add pattern check assertion
-								s.addAssertedElementPattern(generatePatternAssertion(aep));
+								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched));
 								break;
 							case "PatternFullMatch":
 								System.out.println(aep);
 								System.out.println("PatternFullMatch");
-								// add pattern check assertion
-								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
+								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
 								break;
 							case "PatternTagMatch":
 								System.out.println(aep);
 								System.out.println("PatternTagMatch");
-								// add pattern check assertion
-								s.addAssertedElementPattern(generatePatternAssertion(aep)); 
+								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
 								break;
 							}
 
@@ -887,24 +884,68 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
 
-	private AssertedElementPattern generatePatternAssertion(AssertedElementPattern aep) {
+	private AssertedElementPattern generatePatternAssertion(AssertedElementPattern aep, String howMatched) {
+		// pattern assertion on BODY is useless
 		if (aep.getTagName().toUpperCase().equals("BODY"))
-			return null;	
+			return null;
+		
 		String elementTag = aep.getTagName();
+		String elementText = aep.getTextContent();
+		ArrayList<String> elementAttributes = new ArrayList<String>(aep.getAttributes());
+		
 		String parentTag =  aep.getParentTagName();
+		String parentText =  aep.getParentTextContent();
+		ArrayList<String> parentAttributes = new ArrayList<String>(aep.getParentAttributes());
+		
 		ArrayList<String> childrenTags = new ArrayList<String>(aep.getChildrenTagName());
-		String patternCheckAssertion = "assertTrue(isElementPatternPresent(\"" + parentTag + "\",\"" + elementTag + "\", new ArrayList<String>(Arrays.asList(\""; 
+		ArrayList<String> childrenTexts = new ArrayList<String>(aep.getChildrenTextContent());
+		ArrayList<ArrayList<String>> childrenAttributes = new ArrayList<ArrayList<String>>();
+		for (int i=0; i < aep.getChildrenAttributes().size(); i++)
+			childrenAttributes.add(aep.getChildrenAttributes().get(i));
+
+		
+		// DOMElement element = new DOMElement(String tagName, String textContent, ArrayList<String> attributes);
+		String patternCheckAssertion = "DOMElement element = new DOMElement(\"" + elementTag + "\", \"" + elementText + "\", new ArrayList<String>(Arrays.asList(\"";
+		for (int j=0; j < elementAttributes.size()-1; j++)
+			patternCheckAssertion += elementAttributes.get(j) + "\",\"";
+		patternCheckAssertion += elementAttributes.get(elementAttributes.size()-1) + "\")));\n";
+		
+		patternCheckAssertion += "DOMElement parentElement = new DOMElement(\"" + parentTag + "\", \"" + parentText + "\", new ArrayList<String>(Arrays.asList(\"";
+		for (int j=0; j < parentAttributes.size()-1; j++)
+			patternCheckAssertion += parentAttributes.get(j) + "\",\"";
+		patternCheckAssertion += parentAttributes.get(parentAttributes.size()-1) + "\")));\n";
+
+		patternCheckAssertion += "ArrayList<DOMElement> childrenElements = new ArrayList<DOMElement>();\n";
+		for (int k=0; k<childrenTags.size(); k++){
+			patternCheckAssertion += "childrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"" + childrenTexts.get(k) + "\", new ArrayList<String>(Arrays.asList(\"";
+			if (childrenAttributes.size()>0){
+				for (int j=0; j < childrenAttributes.get(k).size()-1; j++)
+					patternCheckAssertion += childrenAttributes.get(k).get(j) + "\",\"";
+				patternCheckAssertion += childrenAttributes.get(k).get(childrenAttributes.get(k).size()-1) + "\"))));\n";
+			}else
+				patternCheckAssertion += "\"))));\n";
+		}
+		
+		// new : DOMElement parent, DOMElement element, ArrayList<DOMElement> children
+		patternCheckAssertion += "assertTrue(isElementPatternPresent(parentElement , element, childrenElements))";
+		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
+		aepMatch.setAssertionOrigin("generated assertion");
+		
+		//old
+		/*patternCheckAssertion += "assertTrue(isElementPatternPresent(\"" + parentTag + "\",\"" + elementTag + "\", new ArrayList<String>(Arrays.asList(\""; 
 		for (int j=0; j < childrenTags.size()-1; j++)
 			patternCheckAssertion += childrenTags.get(j) + "\",\"";
 		patternCheckAssertion += childrenTags.get(childrenTags.size()-1) + "\"))))";
 		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
 		aepMatch.setAssertionOrigin("generated assertion");
-		System.out.println(aepMatch);
+		*/
+		
+		//System.out.println(aepMatch);
 		return aepMatch;
 	}
 
 
-	private AssertedElementPattern generateAssertion(AssertedElementPattern aep, String howMatched) {
+	private AssertedElementPattern generateElementAssertion(AssertedElementPattern aep, String howMatched) {
 		// generating an AssertedElementPattern based on the matching result
 		AssertedElementPattern newaep = new AssertedElementPattern(aep.getSourceElement(), "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
 		
