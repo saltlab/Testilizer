@@ -165,7 +165,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			LOG.info(System.getProperty("java.home"));
 			//Not set on my Mac
-			//System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
+			System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
 
 			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();			
 			DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();

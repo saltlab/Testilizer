@@ -131,8 +131,8 @@ public class SeleniumInstrumentor {
 							//	Instrumenting assertions...
 
 							if (mce.getName().equals("assertTrue") || mce.getName().equals("assertEquals") || mce.getName().equals("assertNotNull") || mce.getName().equals("assertNull")){
-								String codeToInstrumentOn = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.assertionModeOn";
-								String codeToInstrumentOff = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.assertionModeOff";
+								String codeToInstrumentOn = "com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.assertionModeOn";
+								String codeToInstrumentOff = "com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.assertionModeOff";
 								MethodCallExpr callOn = new MethodCallExpr(null, codeToInstrumentOn);
 								MethodCallExpr callOff = new MethodCallExpr(null, codeToInstrumentOff);
 
@@ -143,15 +143,15 @@ public class SeleniumInstrumentor {
 								ASTHelper.addStmt(block, stmt);
 
 								String instrumentableString = makeInstrumentableString(mce.toString());
-								inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+								inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
 								ASTHelper.addStmt(block, inject);
 
 								ASTHelper.addStmt(block, Poststmt);
 								inject = null;	// set inject back to null to prevent redundant injection
 																
 								//String instrumentableString = makeInstrumentableString(mce.toString());
-								//inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
-								//System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+								//inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+								//System.out.println("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
 							}
 							
 							if (mce.getName().equals("clear") || mce.getName().equals("click") || mce.getName().equals("sendKeys")){
@@ -159,13 +159,13 @@ public class SeleniumInstrumentor {
 								List<Expression> args = mce.getArgs();
 								Expression scope = mce.getScope();
 								if (args==null){
-									System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", \"\")." + mce.getName() + "();");
-									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", \"\")." + mce.getName() + "();");
+									System.out.println("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", \"\")." + mce.getName() + "();");
+									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", \"\")." + mce.getName() + "();");
 							        // e.g., com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement(driver.findElement(By.id("login")), "clear", "").clear();
 
 								}else{
-									System.out.println("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
-									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
+									System.out.println("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
+									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
 									// e.g., com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement(driver.findElement(By.id("login")), "sendKeys", "nainy").sendKeys("nainy");
 								}
 							}
@@ -241,10 +241,10 @@ public class SeleniumInstrumentor {
 		// logging the values
 		switch(mce.getName()){
 		case "findElement":
-			codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getBy";
+			codeToInstrument = "com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getBy";
 			break;
 		//case "sendKeys":
-		//	codeToInstrument = "com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getInput";
+		//	codeToInstrument = "com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getInput";
 		//	break;
 		//case "clear":
 		//	System.out.println("CLEAR:");
