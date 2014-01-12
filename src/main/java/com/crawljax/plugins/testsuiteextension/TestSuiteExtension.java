@@ -1,7 +1,5 @@
 package com.crawljax.plugins.testsuiteextension;
 
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -62,7 +60,6 @@ import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.Eventable.EventType;
 import com.crawljax.core.state.Identification.How;
-import com.crawljax.forms.FormHandler;
 import com.crawljax.forms.FormInput;
 import com.crawljax.forms.RandomInputValueGenerator;
 import com.crawljax.plugins.testsuiteextension.jsinstrumentor.JSModifyProxyPlugin;
@@ -109,8 +106,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("TestSuiteExtension plugin started");
 
 		// Bypassing instrumenting and getting exec trace if already done
-		if(true)
-			return;
+		//if(true)
+		//	return;
 		
 		
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
@@ -119,13 +116,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			/**
 			 * (1) Instrumenting original Selenium unit test files
 			 */
-			String appName = "claroline";
+			//String appName = "claroline";
+			String appName = "photogallery";
 			
 			String originalFolderLoc = System.getProperty("user.dir");
 			// On Linux/Mac
-			//folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/originaltests/";
+			originalFolderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/originaltests/";
 			// On Windows
-			originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\originaltests\\";
+			//originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\originaltests\\";
 
 			File originalFolder = new File(originalFolderLoc);
 			LOG.info("originalFolderLoc: {} " , originalFolderLoc);
@@ -151,9 +149,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			 */
 			String instrumentedFolderLoc = System.getProperty("user.dir");
 			// On Linux/Mac
-			//folderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/instrumentedtests/";
+			instrumentedFolderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/instrumentedtests/";
 			// On Windows
-			instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\instrumentedtests\\";
+			//instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\instrumentedtests\\";
 
 			File instrumentedFolder = new File(instrumentedFolderLoc);
 			LOG.info("instrumentedFolderLoc: {}" , instrumentedFolderLoc);
@@ -167,7 +165,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			LOG.info(System.getProperty("java.home"));
 			//Not set on my Mac
-			System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
+			//System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
 
 			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();			
 			DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
@@ -1060,11 +1058,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					
 					testMethod.addStatement(seleniumAction3);
 
-					//adding DOM-mutator to be used for mutation testing of generated assertions
-					testMethod.addStatement("mutateDOMTree();");
 					
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
+						//adding DOM-mutator to be used for mutation testing of generated assertions
+						testMethod.addStatement("mutateDOMTree();");
+						
 						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
 							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
 							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
@@ -1182,12 +1181,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println(seleniumAction3);
 					
 					testMethod.addStatement(seleniumAction3);
-
-					//adding DOM-mutator to be used for mutation testing of generated assertions
-					testMethod.addStatement("mutateDOMTree();");
 					
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
+						//adding DOM-mutator to be used for mutation testing of generated assertions
+						testMethod.addStatement("mutateDOMTree();");
+						
 						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
 							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
 							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
@@ -1355,6 +1354,5 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void onRevisitState(CrawlerContext context, StateVertex currentState) {
 		// TODO: check the assertions from test suite
 	}
-
 
 }

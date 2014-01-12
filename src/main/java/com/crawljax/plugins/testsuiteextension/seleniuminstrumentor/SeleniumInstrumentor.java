@@ -192,13 +192,16 @@ public class SeleniumInstrumentor {
 			}				
 		
 			if (writeBack == true){
+				//String appName = "claroline";
+				String appName = "photogallery";
+				
 				String newFileLoc = System.getProperty("user.dir");
-				// On Linux/Mac
-				newFileLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/instrumentedtests/";
+				// On Linux/Mac			
+				newFileLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/instrumentedtests/";
 				// On Windows
-				//newFileLoc += "\\src\\main\\java\\casestudies\\instrumentedtests\\";
+				//instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\instrumentedtests\\";
 				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
-				cu.setPackage(new PackageDeclaration(new NameExpr("com.crawljax.plugins.testsuiteextension.casestudies.instrumentedtests")));
+				cu.setPackage(new PackageDeclaration(new NameExpr("com.crawljax.plugins.testsuiteextension.casestudies." + appName + ".instrumentedtests")));
 				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
 
 				LOG.info("done writing");
