@@ -515,6 +515,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
 		LOG.info("#states in the SFG after generating happy paths is " + firstConsumer.getContext().getSession().getStateFlowGraph().getNumberOfStates());	
+		LOG.info("#transitions in the SFG after generating happy paths is " + firstConsumer.getContext().getSession().getStateFlowGraph().getAllEdges().size());	
 		
 		CrawlSession session = firstConsumer.getContext().getSession();
 		
@@ -788,79 +789,92 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("***************");
 
 		StateFlowGraph sfg = session.getStateFlowGraph();
-		for (StateVertex s: sfg.getAllStates()){
-			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
-			System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
-			if (s.getAssertions().size()>0){
-				for (int i=0;i<s.getAssertions().size();i++)
-					System.out.println(s.getAssertions().get(i));
-			}
+		int totalAssertions = 0;
+		for (StateVertex s: sfg.getAllStates())
+			totalAssertions += s.getAssertions().size();
 
-			for (AssertedElementPattern	aep: assertedElementPatterns){
-				if (!s.getAssertions().contains(aep.getAssertion())){
-					try {
-						Document dom = DomUtils.asDocument(s.getDom());
-						NodeList nodeList = dom.getElementsByTagName(aep.getTagName());
+		System.out.println("Total number of assertions in happy paths (in original test suite):" + totalAssertions);
+		System.out.println("***************");
 
-						org.w3c.dom.Element element = null;
-						for (int i = 0; i < nodeList.getLength(); i++){
-							element = (org.w3c.dom.Element) nodeList.item(i);
 
-							AssertedElementPattern aepTemp = new AssertedElementPattern(element, "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
-							String howElementMatched = aep.getHowElementMatch(aepTemp);
-							String howPatternMatched = aep.getHowPatternMatch(aepTemp);
-									
-							//aep.getAssertionType();
-							
-							// Asserted Element Level Assertion
-							switch (howElementMatched){
-							case "ElementFullTextMatch":
-								System.out.println(aep);
-								System.out.println("ElementFullTextMatch");
-								System.out.println(aepTemp);
-								aepTemp.setAssertion(aep.getAssertion());
-								aepTemp.setAssertionOrigin("reused assertion");
-								s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
-								break;
-							case "ElementFullMatch":
-								System.out.println(aep);
-								System.out.println("ElementFullMatch");
-								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
-								break;
-							case "ElementTagMatch":
-								System.out.println(aep);
-								System.out.println("ElementTagMatch");
-								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
-								break;
-							}
-							
-							// Asserted Element Pattern Level Assertion
-							switch (howPatternMatched){
-							case "PatternFullTextMatch":
-								System.out.println(aep);
-								System.out.println("PatternFullTextMatch");
-								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched));
-								break;
-							case "PatternFullMatch":
-								System.out.println(aep);
-								System.out.println("PatternFullMatch");
-								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
-								break;
-							case "PatternTagMatch":
-								System.out.println(aep);
-								System.out.println("PatternTagMatch");
-								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
-								break;
-							}
+		// DOM-based assertion generation part
+		boolean doAsssertionGeneration = false;
 
-						}
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+		if (doAsssertionGeneration){
 
+			for (StateVertex s: sfg.getAllStates()){
+				//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
+				System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
+				if (s.getAssertions().size()>0){
+					for (int i=0;i<s.getAssertions().size();i++)
+						System.out.println(s.getAssertions().get(i));
 				}
 
-				/*if (s.getAssertions().size()>0){
+				for (AssertedElementPattern	aep: assertedElementPatterns){
+					if (!s.getAssertions().contains(aep.getAssertion())){
+						try {
+							Document dom = DomUtils.asDocument(s.getDom());
+							NodeList nodeList = dom.getElementsByTagName(aep.getTagName());
+
+							org.w3c.dom.Element element = null;
+							for (int i = 0; i < nodeList.getLength(); i++){
+								element = (org.w3c.dom.Element) nodeList.item(i);
+
+								AssertedElementPattern aepTemp = new AssertedElementPattern(element, "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
+								String howElementMatched = aep.getHowElementMatch(aepTemp);
+								String howPatternMatched = aep.getHowPatternMatch(aepTemp);
+
+								//aep.getAssertionType();
+
+								// Asserted Element Level Assertion
+								switch (howElementMatched){
+								case "ElementFullTextMatch":
+									System.out.println(aep);
+									System.out.println("ElementFullTextMatch");
+									System.out.println(aepTemp);
+									aepTemp.setAssertion(aep.getAssertion());
+									aepTemp.setAssertionOrigin("reused assertion");
+									s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
+									break;
+								case "ElementFullMatch":
+									System.out.println(aep);
+									System.out.println("ElementFullMatch");
+									s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
+									break;
+								case "ElementTagMatch":
+									System.out.println(aep);
+									System.out.println("ElementTagMatch");
+									s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
+									break;
+								}
+
+								// Asserted Element Pattern Level Assertion
+								switch (howPatternMatched){
+								case "PatternFullTextMatch":
+									System.out.println(aep);
+									System.out.println("PatternFullTextMatch");
+									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched));
+									break;
+								case "PatternFullMatch":
+									System.out.println(aep);
+									System.out.println("PatternFullMatch");
+									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
+									break;
+								case "PatternTagMatch":
+									System.out.println(aep);
+									System.out.println("PatternTagMatch");
+									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
+									break;
+								}
+
+							}
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+
+					}
+
+					/*if (s.getAssertions().size()>0){
 					System.out.println("Assertion(s) on state " + s.getName());
 
 					for (int i=0;i<s.getAssertions().size();i++)
@@ -869,18 +883,18 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						System.out.println(s.getAssertedElementPatters().get(i));
 
 				}*/
+				}
+
+				System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after generation.");
+				if (s.getAssertions().size()>0){
+					for (int i=0;i<s.getAssertions().size();i++)
+						System.out.println(s.getAssertions().get(i));
+				}
 			}
-			
-			System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after generation.");
-			if (s.getAssertions().size()>0){
-				for (int i=0;i<s.getAssertions().size();i++)
-					System.out.println(s.getAssertions().get(i));
-			}
-			
+
 		}
-		
 		generateTestSuite(session);
-		
+
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
 
@@ -890,44 +904,46 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			return null;
 		
 		String elementTag = aep.getTagName();
-		String elementText = aep.getTextContent();
+		String elementText = "";//aep.getTextContent();
 		ArrayList<String> elementAttributes = new ArrayList<String>(aep.getAttributes());
 		
 		String parentTag =  aep.getParentTagName();
-		String parentText =  aep.getParentTextContent();
+		String parentText =  "";//aep.getParentTextContent();
 		ArrayList<String> parentAttributes = new ArrayList<String>(aep.getParentAttributes());
 		
 		ArrayList<String> childrenTags = new ArrayList<String>(aep.getChildrenTagName());
-		ArrayList<String> childrenTexts = new ArrayList<String>(aep.getChildrenTextContent());
+		//ArrayList<String> childrenTexts = new ArrayList<String>(aep.getChildrenTextContent());
+		ArrayList<String> childrenTexts = new ArrayList<String>();
 		ArrayList<ArrayList<String>> childrenAttributes = new ArrayList<ArrayList<String>>();
 		for (int i=0; i < aep.getChildrenAttributes().size(); i++)
 			childrenAttributes.add(aep.getChildrenAttributes().get(i));
 
 		
 		// DOMElement element = new DOMElement(String tagName, String textContent, ArrayList<String> attributes);
-		String patternCheckAssertion = "DOMElement element = new DOMElement(\"" + elementTag + "\", \"" + elementText + "\", new ArrayList<String>(Arrays.asList(\"";
+		String patternCheckAssertion = "element = new DOMElement(\"" + elementTag + "\", \"" + elementText.replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
 		for (int j=0; j < elementAttributes.size()-1; j++)
-			patternCheckAssertion += elementAttributes.get(j) + "\",\"";
-		patternCheckAssertion += elementAttributes.get(elementAttributes.size()-1) + "\")));\n";
+			patternCheckAssertion += elementAttributes.get(j).replace("\"", "\\\"") + "\",\"";
+		patternCheckAssertion += elementAttributes.get(elementAttributes.size()-1).replace("\"", "\\\"") + "\")));\n";
 		
-		patternCheckAssertion += "DOMElement parentElement = new DOMElement(\"" + parentTag + "\", \"" + parentText + "\", new ArrayList<String>(Arrays.asList(\"";
+		patternCheckAssertion += "\t\t\tparentElement = new DOMElement(\"" + parentTag + "\", \"" + parentText.replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
 		for (int j=0; j < parentAttributes.size()-1; j++)
-			patternCheckAssertion += parentAttributes.get(j) + "\",\"";
-		patternCheckAssertion += parentAttributes.get(parentAttributes.size()-1) + "\")));\n";
+			patternCheckAssertion += parentAttributes.get(j).replace("\"", "\\\"") + "\",\"";
+		patternCheckAssertion += parentAttributes.get(parentAttributes.size()-1).replace("\"", "\\\"") + "\")));\n";
 
-		patternCheckAssertion += "ArrayList<DOMElement> childrenElements = new ArrayList<DOMElement>();\n";
+		patternCheckAssertion += "\t\t\tchildrenElements.clear();\n";
 		for (int k=0; k<childrenTags.size(); k++){
-			patternCheckAssertion += "childrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"" + childrenTexts.get(k) + "\", new ArrayList<String>(Arrays.asList(\"";
-			if (childrenAttributes.size()>0){
+			//patternCheckAssertion += "\t\t\tchildrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"" + childrenTexts.get(k).replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
+			patternCheckAssertion += "\t\t\tchildrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"\", new ArrayList<String>(Arrays.asList(\"";
+			if (k < childrenAttributes.size() && childrenAttributes.get(k).size()>0){ // check if attributes are less than tags due to being null
 				for (int j=0; j < childrenAttributes.get(k).size()-1; j++)
-					patternCheckAssertion += childrenAttributes.get(k).get(j) + "\",\"";
-				patternCheckAssertion += childrenAttributes.get(k).get(childrenAttributes.get(k).size()-1) + "\"))));\n";
+					patternCheckAssertion += childrenAttributes.get(k).get(j).replace("\"", "\\\"") + "\",\"";
+				patternCheckAssertion += childrenAttributes.get(k).get(childrenAttributes.get(k).size()-1).replace("\"", "\\\"") + "\"))));\n";
 			}else
 				patternCheckAssertion += "\"))));\n";
 		}
 		
 		// new : DOMElement parent, DOMElement element, ArrayList<DOMElement> children
-		patternCheckAssertion += "assertTrue(isElementPatternPresent(parentElement , element, childrenElements))";
+		patternCheckAssertion += "\t\t\tassertTrue(isElementPatternPresent(parentElement , element, childrenElements))";
 		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
 		aepMatch.setAssertionOrigin("generated assertion");
 		
@@ -969,10 +985,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 	/**
-	 * Generating the extended test suite
+	 * Generating the extended test suite in one file
 	 * @param session
 	 */
-	private void generateTestSuite(CrawlSession session) {
+	private void generateTestSuiteInOneFile(CrawlSession session) {
 		StateFlowGraph sfg = session.getStateFlowGraph();
 		
 		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
@@ -1089,6 +1105,134 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	}
 
+
+	
+	/**
+	 * Generating the extended test suite in multiple files
+	 * @param session
+	 */
+	private void generateTestSuite(CrawlSession session) {
+		StateFlowGraph sfg = session.getStateFlowGraph();
+		
+		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
+		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
+		
+		int counter = 0;
+		
+		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
+			//For each new sink node
+			
+			for (GraphPath<StateVertex, Eventable> p : paths) {
+				//For each path to the sink node
+				TestMethod testMethod = new TestMethod("method" + Integer.toString(counter));
+				
+				for (Eventable edge : p.getEdgeList()) {
+					//For each eventable in the path
+					
+					testMethod.addStatement("//From state " + Integer.toString(edge.getSourceStateVertex().getId()) 
+							+ " to state " + Integer.toString(edge.getTargetStateVertex().getId()));
+					testMethod.addStatement("//" + edge.toString());
+					
+					//System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
+					//System.out.println("//" + edge.toString());
+
+					if (edge.getRelatedFormInputs().size() > 0){
+						// First fill the inputs 
+						for (FormInput formInput : edge.getRelatedFormInputs()) {
+							if (formInput.getInputValues().iterator().hasNext()) {
+																
+								if (formInput.getType().toLowerCase().startsWith("text")
+								        || formInput.getType().equalsIgnoreCase("password")
+								        || formInput.getType().equalsIgnoreCase("hidden")) {
+									
+									//System.out.println("how: " + formInput.getIdentification().getHow().toString());
+									//System.out.println("name: " + formInput.getIdentification().getValue());
+									//System.out.println("type: " + formInput.getType());
+									//System.out.println("value: " + formInput.getInputValues().iterator().next().getValue());
+									
+									String seleniumAction1 = "driver.findElement(By." + formInput.getIdentification().getHow().toString() +
+											"(\"" + formInput.getIdentification().getValue() + "\")).clear();";
+									
+									String seleniumAction2 = "driver.findElement(By." + formInput.getIdentification().getHow().toString() +
+											"(\"" + formInput.getIdentification().getValue() + "\")).sendKeys(\"" + 
+											formInput.getInputValues().iterator().next().getValue() + "\");";
+									
+									testMethod.addStatement(seleniumAction1);
+									testMethod.addStatement(seleniumAction2);
+
+									//System.out.println(seleniumAction1);
+									//System.out.println(seleniumAction2);
+									
+								} else if (formInput.getType().equalsIgnoreCase("checkbox")) {
+								} else if (formInput.getType().equalsIgnoreCase("radio")) {
+								} else if (formInput.getType().startsWith("select")) {
+								}
+								
+							}
+						}
+					}
+
+					//System.out.println("how: " + edge.getIdentification().getHow().toString());
+					//System.out.println("value: " + edge.getIdentification().getValue());
+					//System.out.println("text: " + edge.getElement().getText().replaceAll("\"", "\\\\\"").trim());
+
+					String seleniumAction3 = "driver.findElement(By." + edge.getIdentification().getHow().toString() +
+							"(\"" + edge.getIdentification().getValue() + "\")).click();";
+					
+					//System.out.println(seleniumAction3);
+					
+					testMethod.addStatement(seleniumAction3);
+
+					//adding DOM-mutator to be used for mutation testing of generated assertions
+					testMethod.addStatement("mutateDOMTree();");
+					
+					// adding assertions
+					if (edge.getTargetStateVertex().getAssertions().size()>0){
+						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
+							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
+							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
+							testMethod.addStatement(edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion() + "; // " 
+									+ edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin());
+						}
+					}
+
+				}
+
+				testMethods.add(testMethod);
+								
+				String TEST_SUITE_PATH = "src/test/java/generated";
+				String CLASS_NAME = "GeneratedTestCase"+ Integer.toString(counter);
+				String FILE_NAME_TEMPLATE = "TestCase.vm";
+
+				try {
+					DomUtils.directoryCheck(TEST_SUITE_PATH);
+					String fileName = null;
+
+					JavaTestGenerator generator =
+							new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(), testMethods);
+
+					fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
+
+					System.out.println("Tests succesfully generated in " + fileName);		
+
+				} catch (IOException e) {
+					System.out.println("Error in checking " + TEST_SUITE_PATH);
+					e.printStackTrace();
+				} catch (Exception e) {
+					System.out.println("Error generating testsuite: " + e.getMessage());
+					e.printStackTrace();
+				}			
+	
+				
+				counter++;
+				testMethods.clear(); // clearing testMethods for the next JUnit file
+			}
+		}
+
+
+	}
+
+	
 	
 	@Override
 	public String toString() {
@@ -1106,6 +1250,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void onFireEvent(CrawlerContext context, StateVertex stateBefore, Eventable eventable, StateVertex stateAfter) {
 
+		if (true)
+			return;
+		
 		// Calculating JS statement code coverage for feedback-directed exploration
 		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
 			//System.out.println("MODIFIED CODES ARE: " + modifiedJS);
@@ -1130,6 +1277,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
+		
+		if (true)
+			return;
 		
 		// Calculate initial code coverage for the index page to be used by Feedex
 		if (vertex.getId() == vertex.INDEX_ID){
