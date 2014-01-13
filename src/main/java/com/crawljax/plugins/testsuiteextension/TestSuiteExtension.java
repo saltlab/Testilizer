@@ -85,7 +85,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	private EmbeddedBrowser browser = null;
 	CrawljaxConfiguration config = null;
 	
-	private ArrayList<AssertedElementPattern> assertedElementPatterns = new ArrayList<AssertedElementPattern>();
+	private ArrayList<AssertedElementPattern> originalAssertedElementPatterns = new ArrayList<AssertedElementPattern>();
 
 	private boolean inAssertionMode = false;
 	
@@ -303,7 +303,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						break;
 					case " id:":
 						how = Identification.How.id;
-						howValue = methodValue.get(1);
+						howValue = methodValue.get(1);						
 						webElement = browser.getBrowser().findElement(By.id(howValue));
 						break;
 					case " name:":
@@ -352,7 +352,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 						// dealing with random input data
 						if (inputValue.equals("$RandValue")){
-							inputValue = new RandomInputValueGenerator().getRandomString(5);
+							inputValue = "RND-" + new RandomInputValueGenerator().getRandomString(4);
 							System.out.println("Random string " + inputValue + " generated for inputValue");
 						}
 							
@@ -502,7 +502,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						// to distinguish original assertions from reused/generated ones
 						AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, assertedElementLocator);
 						aep.setAssertionOrigin("original assertion");
-						assertedElementPatterns.add(aep);
+						originalAssertedElementPatterns.add(aep);
 						//System.out.println(aep);
 						// adding assertion to the current DOM state in the SFG
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
@@ -765,7 +765,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}
 		}
 		*/
-		assertedElementPatterns.add(aep);
+		originalAssertedElementPatterns.add(aep);
 	}
 	
 	
@@ -785,22 +785,16 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
 		System.out.println("List of asserted element paterns in assertedElementPatterns:");
-		for (AssertedElementPattern	aep: assertedElementPatterns)
+		for (AssertedElementPattern	aep: originalAssertedElementPatterns)
 			System.out.println(aep.getAssertion());
 
 		System.out.println("***************");
 
 		StateFlowGraph sfg = session.getStateFlowGraph();
-		int totalAssertions = 0;
-		for (StateVertex s: sfg.getAllStates())
-			totalAssertions += s.getAssertions().size();
-
-		System.out.println("Total number of assertions in happy paths (in original test suite):" + totalAssertions);
-		System.out.println("***************");
 
 
 		// DOM-based assertion generation part
-		boolean doAsssertionGeneration = false;
+		boolean doAsssertionGeneration = true;
 
 		if (doAsssertionGeneration){
 
@@ -812,7 +806,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						System.out.println(s.getAssertions().get(i));
 				}
 
-				for (AssertedElementPattern	aep: assertedElementPatterns){
+				for (AssertedElementPattern	aep: originalAssertedElementPatterns){
 					if (!s.getAssertions().contains(aep.getAssertion())){
 						try {
 							Document dom = DomUtils.asDocument(s.getDom());
@@ -986,134 +980,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	/**
-	 * Generating the extended test suite in one file
-	 * @param session
-	 */
-	private void generateTestSuiteInOneFile(CrawlSession session) {
-		StateFlowGraph sfg = session.getStateFlowGraph();
-		
-		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
-		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
-		
-		int counter = 0;
-		
-		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
-			//For each new sink node
-			
-			for (GraphPath<StateVertex, Eventable> p : paths) {
-				//For each path to the sink node
-				TestMethod testMethod = new TestMethod("method" + Integer.toString(counter));
-				
-				for (Eventable edge : p.getEdgeList()) {
-					//For each eventable in the path
-					
-					testMethod.addStatement("//From state " + Integer.toString(edge.getSourceStateVertex().getId()) 
-							+ " to state " + Integer.toString(edge.getTargetStateVertex().getId()));
-					testMethod.addStatement("//" + edge.toString());
-					
-					//System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
-					//System.out.println("//" + edge.toString());
-
-					if (edge.getRelatedFormInputs().size() > 0){
-						// First fill the inputs 
-						for (FormInput formInput : edge.getRelatedFormInputs()) {
-							if (formInput.getInputValues().iterator().hasNext()) {
-																
-								if (formInput.getType().toLowerCase().startsWith("text")
-								        || formInput.getType().equalsIgnoreCase("password")
-								        || formInput.getType().equalsIgnoreCase("hidden")) {
-									
-									//System.out.println("how: " + formInput.getIdentification().getHow().toString());
-									//System.out.println("name: " + formInput.getIdentification().getValue());
-									//System.out.println("type: " + formInput.getType());
-									//System.out.println("value: " + formInput.getInputValues().iterator().next().getValue());
-									
-									String seleniumAction1 = "driver.findElement(By." + formInput.getIdentification().getHow().toString() +
-											"(\"" + formInput.getIdentification().getValue() + "\")).clear();";
-									
-									String seleniumAction2 = "driver.findElement(By." + formInput.getIdentification().getHow().toString() +
-											"(\"" + formInput.getIdentification().getValue() + "\")).sendKeys(\"" + 
-											formInput.getInputValues().iterator().next().getValue() + "\");";
-									
-									testMethod.addStatement(seleniumAction1);
-									testMethod.addStatement(seleniumAction2);
-
-									//System.out.println(seleniumAction1);
-									//System.out.println(seleniumAction2);
-									
-								} else if (formInput.getType().equalsIgnoreCase("checkbox")) {
-								} else if (formInput.getType().equalsIgnoreCase("radio")) {
-								} else if (formInput.getType().startsWith("select")) {
-								}
-								
-							}
-						}
-					}
-
-					//System.out.println("how: " + edge.getIdentification().getHow().toString());
-					//System.out.println("value: " + edge.getIdentification().getValue());
-					//System.out.println("text: " + edge.getElement().getText().replaceAll("\"", "\\\\\"").trim());
-
-					String how = edge.getIdentification().getHow().toString();
-					String howValue = edge.getIdentification().getValue().replace("\"", "\\\"");
-					if (how.equals("text"))	
-						how = "linkText";
-									
-					
-					String seleniumAction3 = "driver.findElement(By." + how + "(\"" + howValue + "\")).click();";
-					
-					//System.out.println(seleniumAction3);
-					
-					testMethod.addStatement(seleniumAction3);
-
-					
-					// adding assertions
-					if (edge.getTargetStateVertex().getAssertions().size()>0){
-						//adding DOM-mutator to be used for mutation testing of generated assertions
-						testMethod.addStatement("mutateDOMTree();");
-						
-						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
-							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
-							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
-							testMethod.addStatement(edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion() + "; // " 
-									+ edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin());
-						}
-					}
-
-				}
-				counter++;
-				testMethods.add(testMethod);
-			}
-		}
-
-		String TEST_SUITE_PATH = "src/test/java/generated";
-		String CLASS_NAME = "GeneratedTestCases";
-		String FILE_NAME_TEMPLATE = "TestCase.vm";
-
-		try {
-			DomUtils.directoryCheck(TEST_SUITE_PATH);
-			String fileName = null;
-
-			JavaTestGenerator generator =
-					new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(), testMethods);
-
-			fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
-
-			System.out.println("Tests succesfully generated in " + fileName);		
-
-		} catch (IOException e) {
-			System.out.println("Error in checking " + TEST_SUITE_PATH);
-			e.printStackTrace();
-		} catch (Exception e) {
-			System.out.println("Error generating testsuite: " + e.getMessage());
-			e.printStackTrace();
-		}
-
-
-	}
-
-
 	
 	/**
 	 * Generating the extended test suite in multiple files
@@ -1124,8 +990,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		
 		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
 		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
+		String how, howValue, sendValue, seleniumAction1;
 		
-		int counter = 0;
+		int counter = 0, origAndReusedAssertions=0, reusedAssertions=0, generatedAssertions=0 ;
 		
 		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
 			//For each new sink node
@@ -1144,6 +1011,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
 					//System.out.println("//" + edge.toString());
 
+					
 					if (edge.getRelatedFormInputs().size() > 0){
 						// First fill the inputs 
 						for (FormInput formInput : edge.getRelatedFormInputs()) {
@@ -1157,19 +1025,24 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 									//System.out.println("name: " + formInput.getIdentification().getValue());
 									//System.out.println("type: " + formInput.getType());
 									//System.out.println("value: " + formInput.getInputValues().iterator().next().getValue());
-									
-									String seleniumAction1 = "driver.findElement(By." + formInput.getIdentification().getHow().toString() +
-											"(\"" + formInput.getIdentification().getValue() + "\")).clear();";
-									
-									String seleniumAction2 = "driver.findElement(By." + formInput.getIdentification().getHow().toString() +
-											"(\"" + formInput.getIdentification().getValue() + "\")).sendKeys(\"" + 
-											formInput.getInputValues().iterator().next().getValue() + "\");";
-									
-									testMethod.addStatement(seleniumAction1);
-									testMethod.addStatement(seleniumAction2);
 
-									//System.out.println(seleniumAction1);
-									//System.out.println(seleniumAction2);
+									sendValue = formInput.getInputValues().iterator().next().getValue().replace("\"", "\\\"");
+
+									how = formInput.getIdentification().getHow().toString();
+									howValue = formInput.getIdentification().getValue().replace("\"", "\\\"");
+									if (how.equals("text"))	
+										how = "linkText";
+									if (how.equals("partialText"))
+										how = "partialLinkText";
+									
+									testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).clear();");
+
+									if (sendValue.startsWith("RND-")){
+										testMethod.addStatement("String RandValue = \"RND-\" + new RandomInputValueGenerator().getRandomString(4);");
+										testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).sendKeys(RandValue);");
+									}else
+										testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).sendKeys(\"" + sendValue + "\");");
+									
 									
 								} else if (formInput.getType().equalsIgnoreCase("checkbox")) {
 								} else if (formInput.getType().equalsIgnoreCase("radio")) {
@@ -1184,30 +1057,35 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("value: " + edge.getIdentification().getValue());
 					//System.out.println("text: " + edge.getElement().getText().replaceAll("\"", "\\\\\"").trim());
 
-					String how = edge.getIdentification().getHow().toString();
-					String howValue = edge.getIdentification().getValue().replace("\"", "\\\"");
+					how = edge.getIdentification().getHow().toString();
+					howValue = edge.getIdentification().getValue().replace("\"", "\\\"");
 					if (how.equals("text"))	
 						how = "linkText";
 					if (how.equals("partialText"))
 						how = "partialLinkText";
-									
 					
-					String seleniumAction3 = "driver.findElement(By." + how + "(\"" + howValue + "\")).click();";
 					
-					//System.out.println(seleniumAction3);
-					
-					testMethod.addStatement(seleniumAction3);
-					
+					testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).click();");
+										
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
 						//adding DOM-mutator to be used for mutation testing of generated assertions
 						testMethod.addStatement("mutateDOMTree();");
 						
 						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
+							String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
+							String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+							if (assertionOringin.equals("original assertion"))
+								origAndReusedAssertions++;
+							else if (assertionOringin.equals("reused assertion"))
+								reusedAssertions++;
+							else
+								generatedAssertions++;
+								
+							
 							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
 							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
-							testMethod.addStatement(edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion() + "; // " 
-									+ edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin());
+							testMethod.addStatement(assertion + "; // " + assertionOringin);
 						}
 					}
 
@@ -1237,13 +1115,24 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					System.out.println("Error generating testsuite: " + e.getMessage());
 					e.printStackTrace();
 				}			
-	
-				
+					
 				counter++;
 				testMethods.clear(); // clearing testMethods for the next JUnit file
 			}
 		}
+		
+		int reusedOrigAssertions = origAndReusedAssertions-originalAssertedElementPatterns.size(); // original assertions that are reused in extended paths
 
+		System.out.println("Total #originalAssertions in the original test suite (happy paths):" + originalAssertedElementPatterns.size());
+
+		System.out.println("Total #origAndReusedAssertions in the extended test suite is " + origAndReusedAssertions);
+
+		System.out.println("Total cloned #reusedAsssertions in the extended test suite is " + reusedAssertions);
+
+		reusedAssertions += reusedOrigAssertions;
+
+		System.out.println("Total #reusedAsssertions in the extended test suite is " + reusedAssertions);
+		System.out.println("Total #generatedAsssertions in the extended test suite is " + generatedAssertions);
 
 	}
 
