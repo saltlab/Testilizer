@@ -106,109 +106,110 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("TestSuiteExtension plugin started");
 
 		// Bypassing instrumenting and getting exec trace if already done
-		//if(true)
-		//	return;
+		if(true)
+			return;
 		
 		
 		SeleniumInstrumentor SI = new SeleniumInstrumentor();
 
+		/**
+		 * (1) Instrumenting original Selenium unit test files
+		 */
+		//String appName = "claroline";
+		String appName = "photogallery";
+		
+		String originalFolderLoc = System.getProperty("user.dir");
+		// On Linux/Mac
+		originalFolderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/originaltests/";
+		// On Windows
+		//originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\originaltests\\";
+
+		File originalFolder = new File(originalFolderLoc);
+		LOG.info("originalFolderLoc: {} " , originalFolderLoc);
+
+		File[] listOfOriginalFiles = originalFolder.listFiles(new FilenameFilter() {
+			public boolean accept(File file, String name) {
+				return name.endsWith(".java");
+			}
+		});
+
+
+		for (File file : listOfOriginalFiles) {
+			if (file.isFile()) {
+				LOG.info("file.getName(): {}", file.getName());
+				SI.instrument(file);
+				//break; // instrument only one file...
+			}
+		}
+		
+
+		/**
+		 * (2) Compiling the instrumented Selenium unit test files
+		 */
+		String instrumentedFolderLoc = System.getProperty("user.dir");
+		// On Linux/Mac
+		instrumentedFolderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/instrumentedtests/";
+		// On Windows
+		//instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\instrumentedtests\\";
+
+		File instrumentedFolder = new File(instrumentedFolderLoc);
+		LOG.info("instrumentedFolderLoc: {}" , instrumentedFolderLoc);
+		LOG.info("Compiling the instrumented unit test files located in {}", instrumentedFolder.getAbsolutePath());
+
+		File[] listOfInstrumentedFiles = instrumentedFolder.listFiles(new FilenameFilter() {
+			public boolean accept(File file, String name) {
+				return name.endsWith(".java");
+			}
+		});
+
+		LOG.info(System.getProperty("java.home"));
+		//Not set on my Mac
+		System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
+
+		
+		JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();			
+		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
+		StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, null);
+		Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(listOfInstrumentedFiles));
+		JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, diagnostics, null, null, compilationUnits);
+		boolean success = task.call();
+
+		LOG.info("success = {}", success);
+
+		for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
+			LOG.info("Error on line {} in {}", diagnostic.getLineNumber(), diagnostic.getSource().toString());
+			System.out.println("Error on line " + diagnostic.getLineNumber() + " in " + diagnostic.getSource().toString());
+		}    
+
 		try {
-			/**
-			 * (1) Instrumenting original Selenium unit test files
-			 */
-			//String appName = "claroline";
-			String appName = "photogallery";
-			
-			String originalFolderLoc = System.getProperty("user.dir");
-			// On Linux/Mac
-			originalFolderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/originaltests/";
-			// On Windows
-			//originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\originaltests\\";
-
-			File originalFolder = new File(originalFolderLoc);
-			LOG.info("originalFolderLoc: {} " , originalFolderLoc);
-
-			File[] listOfOriginalFiles = originalFolder.listFiles(new FilenameFilter() {
-				public boolean accept(File file, String name) {
-					return name.endsWith(".java");
-				}
-			});
-
-
-			for (File file : listOfOriginalFiles) {
-				if (file.isFile()) {
-					LOG.info("file.getName(): {}", file.getName());
-					SI.instrument(file);
-					//break; // instrument only one file...
-				}
-			}
-			
-
-			/**
-			 * (2) Compiling the instrumented Selenium unit test files
-			 */
-			String instrumentedFolderLoc = System.getProperty("user.dir");
-			// On Linux/Mac
-			instrumentedFolderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/instrumentedtests/";
-			// On Windows
-			//instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\instrumentedtests\\";
-
-			File instrumentedFolder = new File(instrumentedFolderLoc);
-			LOG.info("instrumentedFolderLoc: {}" , instrumentedFolderLoc);
-			LOG.info("Compiling the instrumented unit test files located in {}", instrumentedFolder.getAbsolutePath());
-
-			File[] listOfInstrumentedFiles = instrumentedFolder.listFiles(new FilenameFilter() {
-				public boolean accept(File file, String name) {
-					return name.endsWith(".java");
-				}
-			});
-
-			LOG.info(System.getProperty("java.home"));
-			//Not set on my Mac
-			System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
-
-			JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();			
-			DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
-			StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, null);
-			Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(listOfInstrumentedFiles));
-			JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, diagnostics, null, null, compilationUnits);
-			boolean success = task.call();
-
-			LOG.info("success = {}", success);
-
-			for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
-				LOG.info("Error on line {} in {}", diagnostic.getLineNumber(), diagnostic.getSource().toString());
-				System.out.println("Error on line " + diagnostic.getLineNumber() + " in " + diagnostic.getSource().toString());
-			}    
-
 			fileManager.close();
-
-			// Not set on my Mac
-			if(success){
-				// Executing the instrumented unit test files. This will produce a log of the execution trace
-				LOG.info("Instrumenting unit test files and logging the execution trace...");
-
-				SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteBegin");
-
-				for (File file : listOfInstrumentedFiles) {
-					if (file.isFile()) {
-						System.out.println("Executing unit test: " + file.getName());
-						System.out.println("Executing unit test in " + file.getAbsolutePath());
-						LOG.info("Executing unit test in {}", file.getName());
-
-						SeleniumInstrumentor.writeToSeleniumExecutionTrace("NewTestCase");
-
-						executeUnitTest(file.getAbsolutePath());
-					}
-					//break; // just to instrument and run one testcase...
-				}
-			}
-
-			SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteEnd");
-
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+
+		// Not set on my Mac
+		if(success){
+			// Executing the instrumented unit test files. This will produce a log of the execution trace
+			LOG.info("Instrumenting unit test files and logging the execution trace...");
+
+			SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteBegin");
+
+			for (File file : listOfInstrumentedFiles) {
+				if (file.isFile()) {
+					System.out.println("Executing unit test: " + file.getName());
+					System.out.println("Executing unit test in " + file.getAbsolutePath());
+					LOG.info("Executing unit test in {}", file.getName());
+
+					SeleniumInstrumentor.writeToSeleniumExecutionTrace("NewTestCase " + file.getName());
+
+					executeUnitTest(file.getAbsolutePath());
+				}
+				//break; // just to instrument and run one testcase...
+			}
+		}
+
+		SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteEnd");
 
 	}
 
@@ -272,8 +273,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			if (st.equals("TestSuiteEnd"))
 				break; // terminating the execution of happy paths
 
-			if (st.equals("NewTestCase")){
-				System.out.println("NewTestCase");
+			if (st.contains("NewTestCase")){
+				System.out.println(st);
 				firstConsumer.getCrawler().reset();
 			}
 
@@ -367,8 +368,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					case "click":
 						if (webElement!=null){
 							// generate corresponding Eventable for webElement
-							event = getCorrespondingEventable(webElement, EventType.click, browser);
+							event = getCorrespondingEventable(webElement, new Identification(how, howValue), EventType.click, browser);
 
+							
 							System.out.println("event: " + event);
 							
 							/*String xpath = getXPath(webElement);
@@ -569,7 +571,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 * to <"css selector:", "button[type="submit"]">
 	 */
 	private ArrayList<String> getMethodValue(String s){
-		String[] withParameter = {" id:", " name:", " xpath:", " tag name:", " class name:", " css selector:", " link text:", " partial link text:", 
+		String[] withParameter = {" id:", " name:", " xpath:", " tag name:", " class name:", " css selector:", " partial link text:", " link text:", 
 				"sendKeys"};
 		String[] withParameterForAssertion = {"assertion", "By.id:", "By.linkText:", "By.partialLinkText:", "By.name:", "By.tagName:", "By.xpath:", "By.className:", "By.selector:"};
 		String[] withoutParameter = {"clear", "click"}; 
@@ -625,14 +627,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	private Eventable getCorrespondingEventable(WebElement webElement, EventType eventType, EmbeddedBrowser browser) {
-		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, browser);
+	private Eventable getCorrespondingEventable(WebElement webElement, Identification identification, EventType eventType, EmbeddedBrowser browser) {
+		CandidateElement candidateElement = getCorrespondingCandidateElement(webElement, identification, browser);
 		Eventable event = new Eventable(candidateElement, eventType);
 		System.out.println(event);
 		return event;
 	}
 
-	private CandidateElement getCorrespondingCandidateElement(WebElement webElement, EmbeddedBrowser browser) {
+	private CandidateElement getCorrespondingCandidateElement(WebElement webElement, Identification identification, EmbeddedBrowser browser) {
 		Document dom;
 		try {
 			dom = DomUtils.asDocument(browser.getStrippedDomWithoutIframeContent());
@@ -640,7 +642,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			// Efficient way to get the corresponding org.w3c.dom.Element of a WebElement
 			String xpath = getXPath(webElement);
 			org.w3c.dom.Element sourceElement = getElementFromXpath(xpath, browser);
-			CandidateElement candidateElement = new CandidateElement(sourceElement, new Identification(Identification.How.xpath, xpath), "");
+			//CandidateElement candidateElement = new CandidateElement(sourceElement, new Identification(Identification.How.xpath, xpath), "");
+			CandidateElement candidateElement = new CandidateElement(sourceElement, identification, "");
 			LOG.debug("Found new candidate element: {} with eventableCondition {}",	candidateElement.getUniqueString(), null);
 			candidateElement.setEventableCondition(null);
 			return candidateElement;
@@ -1051,8 +1054,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("value: " + edge.getIdentification().getValue());
 					//System.out.println("text: " + edge.getElement().getText().replaceAll("\"", "\\\\\"").trim());
 
-					String seleniumAction3 = "driver.findElement(By." + edge.getIdentification().getHow().toString() +
-							"(\"" + edge.getIdentification().getValue() + "\")).click();";
+					String how = edge.getIdentification().getHow().toString();
+					String howValue = edge.getIdentification().getValue().replace("\"", "\\\"");
+					if (how.equals("text"))	
+						how = "linkText";
+									
+					
+					String seleniumAction3 = "driver.findElement(By." + how + "(\"" + howValue + "\")).click();";
 					
 					//System.out.println(seleniumAction3);
 					
@@ -1180,7 +1188,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					
 					//System.out.println(seleniumAction3);
 					
-					testMethod.addStatement(seleniumAction3);
+					//testMethod.addStatement(seleniumAction3);
 					
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
