@@ -427,7 +427,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							//webElement.click();
 
 							// clearing the relatedFormInputs and inputValues to be set for the next click
-							relatedFormInputs.clear();
+							if (howValue.contains("submit"))
+								relatedFormInputs.clear();
 						}
 						break;
 					
@@ -1183,12 +1184,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("value: " + edge.getIdentification().getValue());
 					//System.out.println("text: " + edge.getElement().getText().replaceAll("\"", "\\\\\"").trim());
 
-					String seleniumAction3 = "driver.findElement(By." + edge.getIdentification().getHow().toString() +
-							"(\"" + edge.getIdentification().getValue() + "\")).click();";
+					String how = edge.getIdentification().getHow().toString();
+					String howValue = edge.getIdentification().getValue().replace("\"", "\\\"");
+					if (how.equals("text"))	
+						how = "linkText";
+					if (how.equals("partialText"))
+						how = "partialLinkText";
+									
+					
+					String seleniumAction3 = "driver.findElement(By." + how + "(\"" + howValue + "\")).click();";
 					
 					//System.out.println(seleniumAction3);
 					
-					//testMethod.addStatement(seleniumAction3);
+					testMethod.addStatement(seleniumAction3);
 					
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
