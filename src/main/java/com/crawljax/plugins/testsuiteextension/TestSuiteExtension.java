@@ -822,43 +822,44 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 								//aep.getAssertionType();
 
-								// Asserted Element Level Assertion
+								// AssertedElement-Level Assertion
 								switch (howElementMatched){
-								case "ElementFullTextMatch":
-									System.out.println(aep);
-									System.out.println("ElementFullTextMatch");
-									System.out.println(aepTemp);
+								case "ElementFullMatch":
+									//System.out.println(aep);
+									//System.out.println("ElementFullMatch");
+									//System.out.println(aepTemp);
 									aepTemp.setAssertion(aep.getAssertion());
-									aepTemp.setAssertionOrigin("reused assertion");
+									aepTemp.setAssertionOrigin("reused assertion in case of ElementFullMatch");
 									s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
 									break;
-								case "ElementFullMatch":
-									System.out.println(aep);
-									System.out.println("ElementFullMatch");
+								case "ElementTagAttMatch":
+									//System.out.println(aep);
+									//System.out.println("ElementTagAttMatch");
 									s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
 									break;
 								case "ElementTagMatch":
-									System.out.println(aep);
-									System.out.println("ElementTagMatch");
+									//System.out.println(aep);
+									//System.out.println("ElementTagMatch");
 									s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
 									break;
 								}
 
-								// Asserted Element Pattern Level Assertion
+								
+								// AssertedElementPattern-Level Assertion
 								switch (howPatternMatched){
-								case "PatternFullTextMatch":
-									System.out.println(aep);
-									System.out.println("PatternFullTextMatch");
+								case "PatternFullMatch":
+									//System.out.println(aep);
+									//System.out.println("PatternFullMatch");
 									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched));
 									break;
-								case "PatternFullMatch":
-									System.out.println(aep);
-									System.out.println("PatternFullMatch");
+								case "PatternTagAttMatch":
+									//System.out.println(aep);
+									//System.out.println("PatternTagAttMatch");
 									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
 									break;
 								case "PatternTagMatch":
-									System.out.println(aep);
-									System.out.println("PatternTagMatch");
+									//System.out.println(aep);
+									//System.out.println("PatternTagMatch");
 									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
 									break;
 								}
@@ -938,20 +939,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				patternCheckAssertion += "\"))));\n";
 		}
 		
-		// new : DOMElement parent, DOMElement element, ArrayList<DOMElement> children
-		patternCheckAssertion += "\t\t\tassertTrue(isElementPatternPresent(parentElement , element, childrenElements))";
-		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
-		aepMatch.setAssertionOrigin("generated assertion");
+		if (howMatched.equals("PatternTagMatch"))
+			patternCheckAssertion += "\t\t\tassertTrue(isElementPatternTagPresent(parentElement , element, childrenElements))";
+		else
+			patternCheckAssertion += "\t\t\tassertTrue(isElementPatternFullPresent(parentElement , element, childrenElements))";
 		
-		//old
-		/*patternCheckAssertion += "assertTrue(isElementPatternPresent(\"" + parentTag + "\",\"" + elementTag + "\", new ArrayList<String>(Arrays.asList(\""; 
-		for (int j=0; j < childrenTags.size()-1; j++)
-			patternCheckAssertion += childrenTags.get(j) + "\",\"";
-		patternCheckAssertion += childrenTags.get(childrenTags.size()-1) + "\"))))";
-		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
-		aepMatch.setAssertionOrigin("generated assertion");
-		*/
 		
+		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
+		aepMatch.setAssertionOrigin("generated assertion in case of " + howMatched);
+
 		//System.out.println(aepMatch);
 		return aepMatch;
 	}
@@ -962,7 +958,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		AssertedElementPattern newaep = new AssertedElementPattern(aep.getSourceElement(), "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
 		
 		switch (howMatched){
-		case "ElementFullMatch":
+		case "ElementTagAttMatch":
 			if (newaep.getAssertedElementLocator().toUpperCase().contains("BODY"))
 				return null;
 			newaep.setAssertion("assertTrue(isElementPresent("+ newaep.getAssertedElementLocator() +"))");
@@ -975,7 +971,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			System.out.println(newaep);
 			break;
 		}
-		newaep.setAssertionOrigin("generated assertion");
+		newaep.setAssertionOrigin("generated assertion in case of " + howMatched);
 		return newaep;
 	}
 
@@ -992,7 +988,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
 		String how, howValue, sendValue, seleniumAction1;
 		
-		int counter = 0, origAndReusedAssertions=0, reusedAssertions=0, generatedAssertions=0 ;
+		int counter = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
+				ElementFullMatch = 0, ElementTagAttMatch = 0, ElementTagMatch = 0, PatternFullMatch = 0, PatternTagAttMatch = 0, PatternTagMatch = 0;
 		
 		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
 			//For each new sink node
@@ -1075,14 +1072,29 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
 							String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
 							String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
-							if (assertionOringin.equals("original assertion"))
+							if (assertionOringin.contains("original assertion"))
 								origAndReusedAssertions++;
-							else if (assertionOringin.equals("reused assertion"))
+							else if (assertionOringin.contains("reused assertion")){
 								reusedAssertions++;
-							else
+								if (assertionOringin.contains("ElementFullMatch"))
+									ElementFullMatch++;	
+							}
+							else{
 								generatedAssertions++;
-								
-							
+
+								if (assertionOringin.contains("ElementTagAttMatch"))
+									ElementTagAttMatch++;
+								if (assertionOringin.contains("ElementTagMatch"))
+									ElementTagMatch++;
+								if (assertionOringin.contains("PatternFullMatch"))
+									PatternFullMatch++;
+								if (assertionOringin.contains("PatternTagAttMatch"))
+									PatternTagAttMatch++;
+								if (assertionOringin.contains("PatternTagMatch"))
+									PatternTagMatch++;
+
+							}
+
 							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
 							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
 							testMethod.addStatement(assertion + "; // " + assertionOringin);
@@ -1133,6 +1145,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		System.out.println("Total #reusedAsssertions in the extended test suite is " + reusedAssertions);
 		System.out.println("Total #generatedAsssertions in the extended test suite is " + generatedAssertions);
+		
+		
+		
+		System.out.println("Total #ElementFullMatch is " + ElementFullMatch);
+		System.out.println("Total #ElementTagAttMatch is " + ElementTagAttMatch);
+		System.out.println("Total #ElementTagMatch is " + ElementTagMatch);
+		System.out.println("Total #PatternFullMatch is " + PatternFullMatch);
+		System.out.println("Total #PatternTagAttMatch is " + PatternTagAttMatch);
+		System.out.println("Total #PatternTagMatch is " + PatternTagMatch);
 
 	}
 
