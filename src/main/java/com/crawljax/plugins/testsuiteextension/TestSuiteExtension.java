@@ -79,11 +79,10 @@ import com.google.common.collect.ImmutableList;
  **/
 public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
 PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, OnRevisitStatePlugin{
-	
+
 	// Setting for experiments on DOM-based assertion generation part (default should be true)
-	boolean doAsssertionGeneration = true;
-	
-	
+	static boolean addNewAssertion = false;
+
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
 	private EmbeddedBrowser browser = null;
@@ -808,91 +807,88 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 		// DOM-based assertion generation part
-		if (doAsssertionGeneration){
+		for (StateVertex s: sfg.getAllStates()){
+			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
+			//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
+			//if (s.getAssertions().size()>0){
+			//	for (int i=0;i<s.getAssertions().size();i++)
+			//		System.out.println(s.getAssertions().get(i));
+			//}
 
-			for (StateVertex s: sfg.getAllStates()){
-				//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
-				//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
-				//if (s.getAssertions().size()>0){
-				//	for (int i=0;i<s.getAssertions().size();i++)
-				//		System.out.println(s.getAssertions().get(i));
-				//}
+			for (AssertedElementPattern	aep: originalAssertedElementPatterns){
+				if (!s.getAssertions().contains(aep.getAssertion())){
+					try {
+						Document dom = DomUtils.asDocument(s.getDom());
+						NodeList nodeList = dom.getElementsByTagName(aep.getTagName());
 
-				for (AssertedElementPattern	aep: originalAssertedElementPatterns){
-					if (!s.getAssertions().contains(aep.getAssertion())){
-						try {
-							Document dom = DomUtils.asDocument(s.getDom());
-							NodeList nodeList = dom.getElementsByTagName(aep.getTagName());
+						org.w3c.dom.Element element = null;
+						for (int i = 0; i < nodeList.getLength(); i++){
+							element = (org.w3c.dom.Element) nodeList.item(i);
 
-							org.w3c.dom.Element element = null;
-							for (int i = 0; i < nodeList.getLength(); i++){
-								element = (org.w3c.dom.Element) nodeList.item(i);
+							AssertedElementPattern aepTemp = new AssertedElementPattern(element, "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
+							String howElementMatched = aep.getHowElementMatch(aepTemp);
+							String howPatternMatched = aep.getHowPatternMatch(aepTemp);
 
-								AssertedElementPattern aepTemp = new AssertedElementPattern(element, "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
-								String howElementMatched = aep.getHowElementMatch(aepTemp);
-								String howPatternMatched = aep.getHowPatternMatch(aepTemp);
+							//aep.getAssertionType();
 
-								//aep.getAssertionType();
-
-								// AssertedElement-Level Assertion
-								switch (howElementMatched){
-								case "ElementFullMatch":
-									//System.out.println(aep);
-									//System.out.println("ElementFullMatch");
-									//System.out.println(aepTemp);
-									aepTemp.setAssertion(aep.getAssertion());
-									aepTemp.setAssertionOrigin("reused assertion in case of ElementFullMatch");
-									s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
-									break;
-								case "ElementTagAttMatch":
-									//System.out.println(aep);
-									//System.out.println("ElementTagAttMatch");
-									s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
-									break;
-								case "ElementTagMatch":
-									//System.out.println(aep);
-									//System.out.println("ElementTagMatch");
-									s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
-									break;
-								}
-
-
-								// AssertedElementPattern-Level Assertion
-								switch (howPatternMatched){
-								case "PatternFullMatch":
-									//System.out.println(aep);
-									//System.out.println("PatternFullMatch");
-									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched));
-									break;
-								case "PatternTagAttMatch":
-									//System.out.println(aep);
-									//System.out.println("PatternTagAttMatch");
-									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
-									break;
-								case "PatternTagMatch":
-									//System.out.println(aep);
-									//System.out.println("PatternTagMatch");
-									s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
-									break;
-								}
-
+							// AssertedElement-Level Assertion
+							switch (howElementMatched){
+							case "ElementFullMatch":
+								//System.out.println(aep);
+								//System.out.println("ElementFullMatch");
+								//System.out.println(aepTemp);
+								aepTemp.setAssertion(aep.getAssertion());
+								aepTemp.setAssertionOrigin("reused assertion in case of ElementFullMatch");
+								s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
+								break;
+							case "ElementTagAttMatch":
+								//System.out.println(aep);
+								//System.out.println("ElementTagAttMatch");
+								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
+								break;
+							case "ElementTagMatch":
+								//System.out.println(aep);
+								//System.out.println("ElementTagMatch");
+								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
+								break;
 							}
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
 
+
+							// AssertedElementPattern-Level Assertion
+							switch (howPatternMatched){
+							case "PatternFullMatch":
+								//System.out.println(aep);
+								//System.out.println("PatternFullMatch");
+								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched));
+								break;
+							case "PatternTagAttMatch":
+								//System.out.println(aep);
+								//System.out.println("PatternTagAttMatch");
+								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
+								break;
+							case "PatternTagMatch":
+								//System.out.println(aep);
+								//System.out.println("PatternTagMatch");
+								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
+								break;
+							}
+
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
 					}
 
 				}
 
-				//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after generation.");
-				//if (s.getAssertions().size()>0){
-				//	for (int i=0;i<s.getAssertions().size();i++)
-				//		System.out.println(s.getAssertions().get(i));
-				//}
 			}
 
+			//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after generation.");
+			//if (s.getAssertions().size()>0){
+			//	for (int i=0;i<s.getAssertions().size();i++)
+			//		System.out.println(s.getAssertions().get(i));
+			//}
 		}
+
 		generateTestSuite(session);
 
 		LOG.info("TestSuiteExtension plugin has finished");
@@ -1078,6 +1074,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
 							String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
 							String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+
+							if (assertionOringin.contains("in case of"))
+								testMethod.addStatement("if(shouldConsiderAddedAssertion())");
+
+
 							if (assertionOringin.contains("original assertion"))
 								origAndReusedAssertions++;
 							else if (assertionOringin.contains("reused assertion")){
@@ -1289,6 +1290,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		// TODO: check the assertions from test suite
 	}
 
+
+
+	// The following methods are helpers for the generated JUnit files
+
+	public static boolean shouldConsiderAddedAssertion() {
+		// To be used for executing added assertions for the experiments in the paper
+		return addNewAssertion;
+	}
+
+	public static boolean getCoverageReport() {
+		// To be used for calculating JS code coverage for the experiments in the paper
+		return false;
+	}
 
 	public static String mutateDOMTreeCode() {
 		// To be used for DOM mutation testing for the experiments in the paper
