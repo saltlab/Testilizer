@@ -92,6 +92,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	// Keeping track of executed lines of a JavaScript code for Feedex	
 	private Map<String,ArrayList<Integer>> JSCountList = new Hashtable<String,ArrayList<Integer>>(); 
 	
+	private String finalReport ="";
+	
 	public TestSuiteExtension() {
 		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
@@ -244,6 +246,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		//if (true)
 		//	return;
 		
+		int numOfTestCases = 0;
+		
 		browser = firstConsumer.getContext().getBrowser();
 		config = conf;
 
@@ -275,6 +279,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			if (st.contains("NewTestCase")){
 				System.out.println(st);
+				numOfTestCases++;
 				firstConsumer.getCrawler().reset();
 			}
 
@@ -514,9 +519,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}			
 		}
 
+		finalReport += "#Original test cases: " + Integer.toString(numOfTestCases) + "\n";
+		
 		LOG.info("Initial paths on the SFG was created based on executed instrumented code...");
 		LOG.info("#states in the SFG after generating happy paths is " + firstConsumer.getContext().getSession().getStateFlowGraph().getNumberOfStates());	
 		LOG.info("#transitions in the SFG after generating happy paths is " + firstConsumer.getContext().getSession().getStateFlowGraph().getAllEdges().size());	
+		
+		finalReport += "#states in the SFG after generating happy paths: " + Integer.toString(firstConsumer.getContext().getSession().getStateFlowGraph().getNumberOfStates()) + "\n";
+		finalReport += "#transitions in the SFG after generating happy paths: " + Integer.toString(firstConsumer.getContext().getSession().getStateFlowGraph().getAllEdges().size()) + "\n";
 		
 		CrawlSession session = firstConsumer.getContext().getSession();
 		
@@ -800,11 +810,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			for (StateVertex s: sfg.getAllStates()){
 				//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
-				System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
-				if (s.getAssertions().size()>0){
-					for (int i=0;i<s.getAssertions().size();i++)
-						System.out.println(s.getAssertions().get(i));
-				}
+				//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
+				//if (s.getAssertions().size()>0){
+				//	for (int i=0;i<s.getAssertions().size();i++)
+				//		System.out.println(s.getAssertions().get(i));
+				//}
 
 				for (AssertedElementPattern	aep: originalAssertedElementPatterns){
 					if (!s.getAssertions().contains(aep.getAssertion())){
@@ -882,11 +892,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				}*/
 				}
 
-				System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after generation.");
-				if (s.getAssertions().size()>0){
-					for (int i=0;i<s.getAssertions().size();i++)
-						System.out.println(s.getAssertions().get(i));
-				}
+				//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after generation.");
+				//if (s.getAssertions().size()>0){
+				//	for (int i=0;i<s.getAssertions().size();i++)
+				//		System.out.println(s.getAssertions().get(i));
+				//}
 			}
 
 		}
@@ -962,13 +972,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			if (newaep.getAssertedElementLocator().toUpperCase().contains("BODY"))
 				return null;
 			newaep.setAssertion("assertTrue(isElementPresent("+ newaep.getAssertedElementLocator() +"))");
-			System.out.println(newaep);
+			//System.out.println(newaep);
 			break;
 		case "ElementTagMatch":
 			if (newaep.getTagName().toUpperCase().equals("BODY"))
 				return null;			
 			newaep.setAssertion("assertTrue(isElementPresent(By.tagName(\"" + newaep.getTagName() +"\")))");
-			System.out.println(newaep);
+			//System.out.println(newaep);
 			break;
 		}
 		newaep.setAssertionOrigin("generated assertion in case of " + howMatched);
@@ -1132,6 +1142,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				testMethods.clear(); // clearing testMethods for the next JUnit file
 			}
 		}
+
+		System.out.print(finalReport);
 		
 		int reusedOrigAssertions = origAndReusedAssertions-originalAssertedElementPatterns.size(); // original assertions that are reused in extended paths
 
