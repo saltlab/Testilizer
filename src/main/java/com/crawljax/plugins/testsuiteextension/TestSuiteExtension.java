@@ -1,6 +1,8 @@
 package com.crawljax.plugins.testsuiteextension;
 
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -83,13 +85,32 @@ import com.google.common.collect.ImmutableList;
 public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
 PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, OnRevisitStatePlugin{
 
-	// Setting for experiments on DOM-based assertion generation part (default should be true)
-	static boolean addNewAssertion = true;
+	/**
+	 * Setting for my experiments
+	 */
+	static boolean addNewAssertion = false; // on DOM-based assertion generation part (default should be true)
+
+	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
+
+	// for mutation-testing both should be true
+	static boolean ignoreAndReportAssertionFailure = true;  // on DOM-based mutation testing to evaluate effectiveness (default should be false)
+	static boolean mutateDOM = false;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
+	static boolean currentMutantIsKilled;
+	static int numOFGeneratedMutant = 0;
+	static int numOFKilledMutant = 0;
+	static int numOFOrigAssertDetectedMutant = 0;
+	static int numOFReusedAssertDetectedMutant = 0;
+	static int numOFGeneratedAssertDetectedMutant = 0;
+
+			
+	
+	
+	
 
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
-	private EmbeddedBrowser browser = null;
 	CrawljaxConfiguration config = null;
+	private EmbeddedBrowser browser = null;
 
 	private ArrayList<AssertedElementPattern> originalAssertedElementPatterns = new ArrayList<AssertedElementPattern>();
 
@@ -100,19 +121,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private String finalReport ="";
 
-	
-	BufferedWriter outForLogging;
 
-		
-	
 	public TestSuiteExtension() {
-		try {
-			outForLogging = new BufferedWriter(new FileWriter("Log.txt"));			
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
 		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
 	}
@@ -483,7 +493,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					org.w3c.dom.Element assertedSourceElement = null;
 					String assertion = methodValue.get(1);
 
-					if (assertion.contains(".findElement")){	// only for assertions that access a DOM element
+					if (assertion.contains(".findElement") || assertion.contains("By.")){	// only for assertions that access a DOM element
 
 						System.out.println("methodValue.get(1): " + methodValue.get(1));
 						//wait.until(ExpectedConditions.presenceOfElementLocated(By.linkText(linkText)));
@@ -505,10 +515,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					// to distinguish original assertions from reused/generated ones
 					AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, assertedElementLocator);
 					aep.setAssertionOrigin("original assertion");
-					originalAssertedElementPatterns.add(aep);
+					if (!originalAssertedElementPatterns.contains(aep))
+						originalAssertedElementPatterns.add(aep);
 					// adding assertion to the current DOM state in the SFG
 					firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
-
+					// adding an AssertedElemetPattern-level assertion for the original assertion
+					firstConsumer.getContext().getCurrentState().addAssertedElementPattern(generatePatternAssertion(aep, "OriginalAssertedElemet")); 
 
 					break;
 				default:
@@ -536,7 +548,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		StateFlowGraph sfg = session.getStateFlowGraph();
 
 		FileOutputStream fos = null;
-		
+
 		ObjectOutputStream out = null;
 		// Save the SFG to file
 		String sfgFileName = "sfg.ser";
@@ -758,7 +770,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		return element;
 	}	
 
-	
+
 	/**
 	 * Logs all the candidate elements so that the plugin knows which elements were the candidate
 	 * elements.
@@ -792,6 +804,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			//}
 
 			for (AssertedElementPattern	aep: originalAssertedElementPatterns){
+				//System.out.println("aep: " +  aep);
+				
 				if (!s.getAssertions().contains(aep.getAssertion())){
 					try {
 						Document dom = DomUtils.asDocument(s.getDom());
@@ -810,21 +824,21 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// AssertedElement-Level Assertion
 							switch (howElementMatched){
 							case "ElementFullMatch":
-								outForLogging.write("\n"+aep);
-								outForLogging.write("\n"+"ElementFullMatch");
-								outForLogging.write("\n"+aepTemp);
+								//System.out.println(aep);
+								//System.out.println("ElementFullMatch");
+								//System.out.println(aepTemp);
 								aepTemp.setAssertion(aep.getAssertion());
 								aepTemp.setAssertionOrigin("reused assertion in case of ElementFullMatch");
 								s.addAssertedElementPattern(aepTemp); // reuse the same AssertedElementPattern
 								break;
 							case "ElementTagAttMatch":
-								outForLogging.write("\n"+aep);
-								outForLogging.write("\n"+"ElementTagAttMatch");
+								//System.out.println(aep);
+								//System.out.println("ElementTagAttMatch");
 								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
 								break;
 							case "ElementTagMatch":
-								outForLogging.write("\n"+aep);
-								outForLogging.write("\n"+"ElementTagMatch");
+								//System.out.println(aep);
+								//System.out.println("ElementTagMatch");
 								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
 								break;
 							}
@@ -833,18 +847,18 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// AssertedElementPattern-Level Assertion
 							switch (howPatternMatched){
 							case "PatternFullMatch":
-								outForLogging.write("\n"+aep);
-								outForLogging.write("\n"+"PatternFullMatch");
+								//System.out.println(aep);
+								//System.out.println("PatternFullMatch");
 								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched));
 								break;
 							case "PatternTagAttMatch":
-								outForLogging.write("\n"+aep);
-								outForLogging.write("\n"+"PatternTagAttMatch");
+								//System.out.println(aep);
+								//System.out.println("PatternTagAttMatch");
 								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
 								break;
 							case "PatternTagMatch":
-								outForLogging.write("\n"+aep);
-								outForLogging.write("\n"+"PatternTagMatch");
+								//System.out.println(aep);
+								//System.out.println("PatternTagMatch");
 								s.addAssertedElementPattern(generatePatternAssertion(aep, howPatternMatched)); 
 								break;
 							}
@@ -866,6 +880,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 		generateTestSuite(session);
+		
+		LOG.info("#states in the final SFG: " + sfg.getNumberOfStates());	
+		LOG.info("#transitions in the final SFG: " + sfg.getAllEdges().size());	
+
 
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
@@ -876,6 +894,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			return null;
 
 		String elementTag = aep.getTagName();
+		if (elementTag.equals("")) // do not create AEP-level assertion for undefined asserted elements (such as those on title, alerts, url, etc.)
+			return null;
+		
 		String elementText = "";//aep.getTextContent();
 		ArrayList<String> elementAttributes = new ArrayList<String>(aep.getAttributes());
 
@@ -893,9 +914,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		// DOMElement element = new DOMElement(String tagName, String textContent, ArrayList<String> attributes);
 		String patternCheckAssertion = "element = new DOMElement(\"" + elementTag + "\", \"" + elementText.replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
-		for (int j=0; j < elementAttributes.size()-1; j++)
-			patternCheckAssertion += elementAttributes.get(j).replace("\"", "\\\"") + "\",\"";
-		patternCheckAssertion += elementAttributes.get(elementAttributes.size()-1).replace("\"", "\\\"") + "\")));\n";
+		if (elementAttributes.size()>0){ // avoiding null
+			for (int j=0; j < elementAttributes.size()-1; j++)
+				patternCheckAssertion += elementAttributes.get(j).replace("\"", "\\\"") + "\",\"";
+			patternCheckAssertion += elementAttributes.get(elementAttributes.size()-1).replace("\"", "\\\"") + "\")));\n";
+		}else
+			patternCheckAssertion += "\")));\n";
 
 		patternCheckAssertion += "\t\t\tparentElement = new DOMElement(\"" + parentTag + "\", \"" + parentText.replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
 		if (parentAttributes.size()>0){ // avoiding null
@@ -926,12 +950,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
 		aepMatch.setAssertionOrigin("generated assertion in case of " + howMatched);
 
-		try {
-			outForLogging.write("\n"+aepMatch);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+
+		//System.out.println(aepMatch);
+
 		return aepMatch;
 	}
 
@@ -945,23 +966,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			if (newaep.getAssertedElementLocator().toUpperCase().contains("BODY"))
 				return null;
 			newaep.setAssertion("assertTrue(isElementPresent("+ newaep.getAssertedElementLocator() +"))");
-			try {
-				outForLogging.write("\n"+newaep);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			//System.out.println(newaep);
 			break;
 		case "ElementTagMatch":
 			if (newaep.getTagName().toUpperCase().equals("BODY"))
 				return null;			
 			newaep.setAssertion("assertTrue(isElementPresent(By.tagName(\"" + newaep.getTagName() +"\")))");
-			try {
-				outForLogging.write("\n"+newaep);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			//System.out.println(newaep);
 			break;
 		}
 		newaep.setAssertionOrigin("generated assertion in case of " + howMatched);
@@ -1096,6 +1107,23 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
 							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
+							testMethod.addStatement("// " + assertion);
+
+							// Wrapping the original assert statements
+							String type = null;
+							if (assertionOringin.contains("original assertion"))
+								type = "original";
+							else if (assertionOringin.contains("reused assertion"))
+								type = "reused";
+							else if (assertionOringin.contains("generated assertion"))
+								type = "generated";
+							assertion.replace("assertTrue(", "verifyTrue(\"" + type + "\", ");
+							assertion.replace("assertEquals(", "verifyEquals(\"" + type + "\", ");
+							assertion.replace("assertNotNull(", "verifyNotNull(\"" + type + "\", ");
+							assertion.replace("assertNull(", "verifyNull(\"" + type + "\", ");
+							
+
+							// Adding assertion to the method
 							testMethod.addStatement(assertion + "; // " + assertionOringin);
 							if (assertionOringin.contains("in case of"))
 								testMethod.addStatement("}");
@@ -1136,13 +1164,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		System.out.print(finalReport);
 
-		
+
 		System.out.println("Total #assertions in the original test suite:" + originalAssertedElementPatterns.size());
 
 		System.out.println("Total #assertions in the test suite from happy paths: " + origAndReusedAssertions);
 
 		System.out.println("Total #assertions in the extended test suite:" + totalAssertions);
-		
+
 		System.out.println("Total #cloned (reused) assertions in the extended test suite: " + reusedAssertions);
 
 		int reusedOrigAssertions = origAndReusedAssertions-originalAssertedElementPatterns.size(); // original assertions that are reused in extended paths		
@@ -1159,13 +1187,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("Total #PatternTagAttMatch: " + PatternTagAttMatch);
 		System.out.println("Total #PatternTagMatch: " + PatternTagMatch);
 
+		System.out.println("Total #OrigAssertDetectedMutant: " + numOFOrigAssertDetectedMutant);
+		System.out.println("Total #ReusedAssertDetectedMutant: " + numOFReusedAssertDetectedMutant);
+		System.out.println("Total #GeneratedAssertDetectedMutant: " + numOFGeneratedAssertDetectedMutant);
 		
-		try {
-			outForLogging.close();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 
 	}
 
@@ -1297,19 +1322,75 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	// The following methods are helpers for the generated JUnit files
 
+	// To be used for executing added assertions for the experiments in the paper
 	public static boolean shouldConsiderAddedAssertion() {
-		// To be used for executing added assertions for the experiments in the paper
 		return addNewAssertion;
 	}
 
+	// To be used for calculating JS code coverage for the experiments in the paper
 	public static boolean getCoverageReport() {
-		// To be used for calculating JS code coverage for the experiments in the paper
-		return false;
+		return getCoverageReport;
 	}
 
+	
+
+	
+	/**
+	 *  Helpers for doing DOM-based mutation testing
+	 */
+
+	// To be used for executing added assertions for the experiments in the paper
+	public static boolean shouldIgnoreAssertionFailure() {
+		return ignoreAndReportAssertionFailure;
+	}
+	
+	// To be used for DOM mutation testing for the experiments in the paper
 	public static String mutateDOMTreeCode() {
-		// To be used for DOM mutation testing for the experiments in the paper
+		// generate code for DOM mutation
+		String jsCode = null;
+		if (mutateDOM == true){
+			currentMutantIsKilled = false;
+			numOFGeneratedMutant++;
+			return jsCode;
+		}
 		return null;
 	}
+	
+	// To be used for executing added assertions for the experiments in the paper
+	public static void verifyTrue(String assertionType, boolean assertionCondition) {
+		if (assertionCondition == false){
+			killMutant();
+		}
+		
+	}
+	public static void verifyEquals(String assertionType, String s1, String s2) {
+		if (!s1.equals(s2)){
+			killMutant();
+		}	
+	}
+	public static void verifyNotNull(String assertionType, Object o) {
+		if (o == null){
+			killMutant();
+		}	
+	}
+	public static void verifyNull(String assertionType, Object o) {
+		if (o != null){
+			killMutant();
+		}	
+	}
+	public static void killMutant(){
+		if (currentMutantIsKilled == false){
+			currentMutantIsKilled = true;
+			numOFKilledMutant++;
+		}	
+	}
+	public static void reportFailedAssertion(String assertionType){
+		if (assertionType.equals("original"))
+			numOFOrigAssertDetectedMutant++;
+		else if (assertionType.equals("reused"))
+			numOFReusedAssertDetectedMutant++;
+		else if (assertionType.equals("generated"))
+			numOFGeneratedAssertDetectedMutant++;
+	}	
 
 }
