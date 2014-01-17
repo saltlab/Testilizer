@@ -1070,7 +1070,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 					// adding assertions
 					if (edge.getTargetStateVertex().getAssertions().size()>0){
-						//adding DOM-mutator to be used for mutation testing of generated assertions
+						
+						// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
 						testMethod.addStatement("mutateDOMTree();");
 
 						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
@@ -1128,6 +1129,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							if (assertionOringin.contains("in case of"))
 								testMethod.addStatement("}");
 						}
+						
+						// restoring the mutated DOM
+						testMethod.addStatement("restoreDOMTree();");
 					}
 
 				}
@@ -1348,6 +1352,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public static String mutateDOMTreeCode() {
 		// generate code for DOM mutation
 		String jsCode = null;
+		//code = "var foo = document.getElementById('headerBar'); while (foo.firstChild) foo.removeChild(foo.firstChild);";
+
 		if (mutateDOM == true){
 			currentMutantIsKilled = false;
 			numOFGeneratedMutant++;
