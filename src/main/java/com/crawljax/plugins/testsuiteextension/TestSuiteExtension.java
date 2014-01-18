@@ -400,20 +400,24 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					if (webElement!=null){
 						// generate corresponding Eventable for webElement
 						event = getCorrespondingEventable(webElement, new Identification(how, howValue), EventType.click, browser);
-
-
 						System.out.println("event: " + event);
 
-						/*String xpath = getXPath(webElement);
-							try {
 
-								String xpath2 = XPathHelper.getXPathExpression(getElementFromXpath(xpath, browser));
-								System.out.println("fast Element found has xpath: " + xpath2);
-
-								//System.out.println("Fast Element found is: " + getElementFromXpath(xpath, browser));
-							} catch (XPathExpressionException e) {
-								e.printStackTrace();
-							}*/
+						// creating assertion to check existence of the clickable element
+						String xpath = getXPath(webElement);
+						org.w3c.dom.Element clikcedElement = null;
+						try {
+							clikcedElement = getElementFromXpath(xpath, browser);
+							System.out.println("The assertedSourceElement is: " + clikcedElement);
+						} catch (XPathExpressionException e) {
+							System.out.println("XPathExpressionException!");
+							e.printStackTrace();
+						}
+						AssertedElementPattern aep = new AssertedElementPattern(clikcedElement, "", assertedElementLocator);
+						aep.setAssertion("assertTrue(isElementPresent("+ aep.getAssertedElementLocator() +"))");
+						aep.setAssertionOrigin("generated assertion");
+						// adding assertion to the current DOM state in the SFG
+						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
 
 
 						//System.out.println("setting form inputs with: " + relatedFormInputs);
@@ -1353,7 +1357,29 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		// generate code for DOM mutation
 		String jsCode = null;
 		//code = "var foo = document.getElementById('headerBar'); while (foo.firstChild) foo.removeChild(foo.firstChild);";
+		
+		// getting random DOM element
+		// getRandomObject(seed)  return document.getElementsByTagName('*')[Math.round(document.getElementsByTagName('*').length*seed/100)];
 
+		// remove parent and all children
+		// var x = document.getElementById('parent');  x.parentNode.removeChild(x);
+
+		// remove all children elements of a DOM node
+		// var foo = document.getElementById('foo');	while (foo.firstChild) foo.removeChild(foo.firstChild);
+
+		// remove all attributes of a DOM element
+		/* 
+		function removeAllAttrs(element) {
+		    for (var i= element.attributes.length; i-->0;)
+		        element.removeAttributeNode(element.attributes[i]);
+		}
+		removeAllAttrs(document.body);
+		*/
+		
+		// remove text of element
+		// innerHTML
+		
+		
 		if (mutateDOM == true){
 			currentMutantIsKilled = false;
 			numOFGeneratedMutant++;
