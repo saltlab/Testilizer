@@ -88,7 +88,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	/**
 	 * Setting for my experiments
 	 */
-	static boolean addNewAssertion = false; // on DOM-based assertion generation part (default should be true)
+	static boolean addAssertionsToExtendedSuite = false; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
@@ -102,10 +102,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	static int numOFReusedAssertDetectedMutant = 0;
 	static int numOFGeneratedAssertDetectedMutant = 0;
 
-			
-	
-	
-	
+
+
+
+
 
 	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
 
@@ -291,7 +291,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		How how = null;
 		String howValue = null;
-		String assertedElementLocator = null;
+		String elementLocator = null;
 
 		for (String st: trace){
 			// read the value such as id, cssSelector, xpath, and etc. 
@@ -336,42 +336,50 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					break;
 				case " id:":
 					how = Identification.How.id;
-					howValue = methodValue.get(1);						
+					howValue = methodValue.get(1);
+					elementLocator = "By.id(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.id(howValue));
 					break;
 				case " name:":
 					how = Identification.How.name;
 					howValue = methodValue.get(1);
+					elementLocator = "By.name(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.name(howValue));
 					break;
 				case " xpath:":
 					how = Identification.How.xpath;
 					howValue = methodValue.get(1);
+					elementLocator = "By.xpath(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.xpath(howValue));
 					break;
 				case " tag name:":
 					how = Identification.How.tag;
 					howValue = methodValue.get(1);
+					elementLocator = "By.tagName(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.tagName(howValue));
 					break;
 				case " class name:":
 					how = Identification.How.name;
 					howValue = methodValue.get(1);
+					elementLocator = "By.className(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.className(howValue));
 					break;
 				case " css selector:":
 					how = Identification.How.cssSelector;
 					howValue = methodValue.get(1);
 					webElement = browser.getBrowser().findElement(By.cssSelector(howValue));
+					elementLocator = "By.cssSelector(\"" + howValue.replace("\"", "\\\"") +"\")";
 					break;
 				case " link text:":
 					how = Identification.How.text;
 					howValue = methodValue.get(1);
+					elementLocator = "By.linkText(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.linkText(howValue));
 					break;
 				case " partial link text:":
 					how = Identification.How.partialText;
 					howValue = methodValue.get(1);
+					elementLocator = "By.partialLinkText(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.partialLinkText(howValue));
 					break;
 				case "clear":
@@ -413,9 +421,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							System.out.println("XPathExpressionException!");
 							e.printStackTrace();
 						}
-						AssertedElementPattern aep = new AssertedElementPattern(clikcedElement, "", assertedElementLocator);
+						AssertedElementPattern aep = new AssertedElementPattern(clikcedElement, "", elementLocator);
 						aep.setAssertion("assertTrue(isElementPresent("+ aep.getAssertedElementLocator() +"))");
-						aep.setAssertionOrigin("generated assertion");
+						aep.setAssertionOrigin("generated assertion in case of actionable element");
 						// adding assertion to the current DOM state in the SFG
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
 
@@ -453,42 +461,42 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 				case "By.id:":
 					howValue = methodValue.get(1);
-					assertedElementLocator = "By.id(\"" + howValue +"\")";
+					elementLocator = "By.id(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.id(howValue));
 					break;
 				case "By.linkText:":
 					howValue = methodValue.get(1);
-					assertedElementLocator = "By.linkText(\"" + howValue +"\")";
+					elementLocator = "By.linkText(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.linkText(howValue));
 					break;
 				case "By.partialLinkText:":
 					howValue = methodValue.get(1);
-					assertedElementLocator = "By.partialLinkText(\"" + howValue +"\")";
+					elementLocator = "By.partialLinkText(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.partialLinkText(howValue));
 					break;
 				case "By.name:":
 					howValue = methodValue.get(1);
-					assertedElementLocator = "By.name(\"" + howValue +"\")";
+					elementLocator = "By.name(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.name(howValue));
 					break;
 				case "By.tagName:":
 					howValue = methodValue.get(1);
-					assertedElementLocator = "By.tagName(\"" + howValue +"\")";
+					elementLocator = "By.tagName(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.tagName(howValue));
 					break;
 				case "By.xpath:":
 					howValue = methodValue.get(1);
-					assertedElementLocator = "By.xpath(\"" + howValue +"\")";
+					elementLocator = "By.xpath(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.xpath(howValue));
 					break;
 				case "By.className:":
 					howValue = methodValue.get(1);
-					assertedElementLocator = "By.className(\"" + howValue +"\")";
+					elementLocator = "By.className(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.className(howValue));
 					break;
 				case "By.selector:":
 					howValue = methodValue.get(1);
-					assertedElementLocator = "By.cssSelector(\"" + howValue +"\")";
+					elementLocator = "By.cssSelector(\"" + howValue +"\")";
 					webElement = browser.getBrowser().findElement(By.cssSelector(howValue));
 					System.out.println("Found webElement: " + webElement);
 					break;
@@ -517,7 +525,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					}
 
 					// to distinguish original assertions from reused/generated ones
-					AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, assertedElementLocator);
+					AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, elementLocator);
 					aep.setAssertionOrigin("original assertion");
 					if (!originalAssertedElementPatterns.contains(aep))
 						originalAssertedElementPatterns.add(aep);
@@ -797,7 +805,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		StateFlowGraph sfg = session.getStateFlowGraph();
 
-
 		// DOM-based assertion generation part
 		for (StateVertex s: sfg.getAllStates()){
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
@@ -809,7 +816,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			for (AssertedElementPattern	aep: originalAssertedElementPatterns){
 				//System.out.println("aep: " +  aep);
-				
+
 				if (!s.getAssertions().contains(aep.getAssertion())){
 					try {
 						Document dom = DomUtils.asDocument(s.getDom());
@@ -847,7 +854,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								break;
 							}
 
-
 							// AssertedElementPattern-Level Assertion
 							switch (howPatternMatched){
 							case "PatternFullMatch":
@@ -884,7 +890,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 		generateTestSuite(session);
-		
+
 		LOG.info("#states in the final SFG: " + sfg.getNumberOfStates());	
 		LOG.info("#transitions in the final SFG: " + sfg.getAllEdges().size());	
 
@@ -900,7 +906,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		String elementTag = aep.getTagName();
 		if (elementTag.equals("")) // do not create AEP-level assertion for undefined asserted elements (such as those on title, alerts, url, etc.)
 			return null;
-		
+
 		String elementText = "";//aep.getTextContent();
 		ArrayList<String> elementAttributes = new ArrayList<String>(aep.getAttributes());
 
@@ -994,9 +1000,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
 		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
-		String how, howValue, sendValue, seleniumAction1;
+		String how, howValue, sendValue;
 
-		int counter = 0, totalAssertions = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
+		int counter = 0, totalAssertions = 0, actionableAssertions = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
 				ElementFullMatch = 0, ElementTagAttMatch = 0, ElementTagMatch = 0, PatternFullMatch = 0, PatternTagAttMatch = 0, PatternTagMatch = 0;
 
 		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
@@ -1016,7 +1022,68 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
 					//System.out.println("//" + edge.toString());
 
+					// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
+					testMethod.addStatement("mutateDOMTree();");
 
+					// adding assertions
+					if (edge.getSourceStateVertex().getAssertions().size()>0){
+						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementPatters().size();i++){
+							String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
+							String assertionOringin = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+
+							// Wrapping the original assert statements
+							/*String type = null;
+							if (assertionOringin.contains("original assertion"))
+								type = "original";
+							else if (assertionOringin.contains("reused assertion"))
+								type = "reused";
+							else if (assertionOringin.contains("generated assertion"))
+								type = "generated";
+							String toRelace = "verifyTrue(\"".concat(type).concat("\", ");
+							assertion = assertion.replace("assertTrue(", toRelace);
+							toRelace = "verifyEquals(\"".concat(type).concat("\", ");
+							assertion.replace("assertEquals(", toRelace);
+							toRelace = "verifyNotNull(\"".concat(type).concat("\", ");
+							assertion.replace("assertNotNull(", toRelace);
+							toRelace = "verifyNull(\"".concat(type).concat("\", ");
+							assertion.replace("assertNull(", toRelace);
+							 */
+
+							if (assertionOringin.contains("original assertion")){
+								// Adding assertion to the method
+								testMethod.addStatement(assertion + "; // " + assertionOringin);
+								origAndReusedAssertions++;
+								totalAssertions++;
+							}else if (shouldAddAssertionsToExtendedSuite()){
+								// Adding assertion to the method
+								testMethod.addStatement(assertion + "; // " + assertionOringin);
+								origAndReusedAssertions++;
+								if (assertionOringin.contains("reused assertion")){
+									reusedAssertions++;
+									if (assertionOringin.contains("ElementFullMatch"))
+										ElementFullMatch++;	
+								}else{
+									generatedAssertions++;
+									if (assertionOringin.contains("actionable"))
+										actionableAssertions++;
+									if (assertionOringin.contains("ElementTagAttMatch"))
+										ElementTagAttMatch++;
+									if (assertionOringin.contains("ElementTagMatch"))
+										ElementTagMatch++;
+									if (assertionOringin.contains("PatternFullMatch"))
+										PatternFullMatch++;
+									if (assertionOringin.contains("PatternTagAttMatch"))
+										PatternTagAttMatch++;
+									if (assertionOringin.contains("PatternTagMatch"))
+										PatternTagMatch++;
+								}
+							}
+
+						}
+					}
+
+
+					// applying the click
 					if (edge.getRelatedFormInputs().size() > 0){
 						// First fill the inputs 
 						for (FormInput formInput : edge.getRelatedFormInputs()) {
@@ -1069,77 +1136,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					if (how.equals("partialText"))
 						how = "partialLinkText";
 
-
 					testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).click();");
-
-					// adding assertions
-					if (edge.getTargetStateVertex().getAssertions().size()>0){
-						
-						// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
-						testMethod.addStatement("mutateDOMTree();");
-
-						for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
-							totalAssertions++;
-							String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
-							String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
-
-							if (assertionOringin.contains("in case of"))
-								testMethod.addStatement("if(shouldConsiderAddedAssertion()){");
-
-
-							if (assertionOringin.contains("original assertion"))
-								origAndReusedAssertions++;
-							else if (assertionOringin.contains("reused assertion")){
-								reusedAssertions++;
-								if (assertionOringin.contains("ElementFullMatch"))
-									ElementFullMatch++;	
-							}
-							else{
-								generatedAssertions++;
-
-								if (assertionOringin.contains("ElementTagAttMatch"))
-									ElementTagAttMatch++;
-								if (assertionOringin.contains("ElementTagMatch"))
-									ElementTagMatch++;
-								if (assertionOringin.contains("PatternFullMatch"))
-									PatternFullMatch++;
-								if (assertionOringin.contains("PatternTagAttMatch"))
-									PatternTagAttMatch++;
-								if (assertionOringin.contains("PatternTagMatch"))
-									PatternTagMatch++;
-
-							}
-
-							//System.out.println(edge.getTargetStateVertex().getAssertions().get(i) + ";");
-							//testMethod.addStatement(edge.getTargetStateVertex().getAssertions().get(i) + "; // " + edge.getTargetStateVertex().getAssertions().get(i));
-							testMethod.addStatement("// " + assertion);
-
-							// Wrapping the original assert statements
-							String type = null;
-							if (assertionOringin.contains("original assertion"))
-								type = "original";
-							else if (assertionOringin.contains("reused assertion"))
-								type = "reused";
-							else if (assertionOringin.contains("generated assertion"))
-								type = "generated";
-							assertion.replace("assertTrue(", "verifyTrue(\"" + type + "\", ");
-							assertion.replace("assertEquals(", "verifyEquals(\"" + type + "\", ");
-							assertion.replace("assertNotNull(", "verifyNotNull(\"" + type + "\", ");
-							assertion.replace("assertNull(", "verifyNull(\"" + type + "\", ");
-							
-
-							// Adding assertion to the method
-							testMethod.addStatement(assertion + "; // " + assertionOringin);
-							if (assertionOringin.contains("in case of"))
-								testMethod.addStatement("}");
-						}
-						
-						// restoring the mutated DOM
-						testMethod.addStatement("restoreDOMTree();");
-					}
-
 				}
 
+
+				// adding the test method to the file
 				testMethods.add(testMethod);
 
 				String TEST_SUITE_PATH = "src/test/java/generated";
@@ -1172,14 +1173,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		System.out.print(finalReport);
 
+		System.out.println("Total #sink nodes:" + results.size());
 
 		System.out.println("Total #assertions in the original test suite:" + originalAssertedElementPatterns.size());
 
-		System.out.println("Total #assertions in the test suite from happy paths: " + origAndReusedAssertions);
+		System.out.println("Total #assertions in the test suite from happy paths (origAndReusedAssertions): " + origAndReusedAssertions);
 
-		System.out.println("Total #assertions in the extended test suite:" + totalAssertions);
+		System.out.println("Total #assertions in the final extended test suite:" + totalAssertions);
 
-		System.out.println("Total #cloned (reused) assertions in the extended test suite: " + reusedAssertions);
+		//System.out.println("Total #reused (cloned in other states) assertions in the extended test suite: " + reusedAssertions);
 
 		int reusedOrigAssertions = origAndReusedAssertions-originalAssertedElementPatterns.size(); // original assertions that are reused in extended paths		
 		reusedAssertions += reusedOrigAssertions;
@@ -1188,6 +1190,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("Total #generated assertions in the extended test suite: " + generatedAssertions);
 
 
+		System.out.println("Total #actionableAssertions: " + actionableAssertions);
 		System.out.println("Total #ElementFullMatch: " + ElementFullMatch);
 		System.out.println("Total #ElementTagAttMatch: " + ElementTagAttMatch);
 		System.out.println("Total #ElementTagMatch: " + ElementTagMatch);
@@ -1195,10 +1198,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("Total #PatternTagAttMatch: " + PatternTagAttMatch);
 		System.out.println("Total #PatternTagMatch: " + PatternTagMatch);
 
-		System.out.println("Total #OrigAssertDetectedMutant: " + numOFOrigAssertDetectedMutant);
-		System.out.println("Total #ReusedAssertDetectedMutant: " + numOFReusedAssertDetectedMutant);
-		System.out.println("Total #GeneratedAssertDetectedMutant: " + numOFGeneratedAssertDetectedMutant);
-		
+		// for the future work on higher order mutation
+		//System.out.println("Total #OrigAssertDetectedMutant: " + numOFOrigAssertDetectedMutant);
+		//System.out.println("Total #ReusedAssertDetectedMutant: " + numOFReusedAssertDetectedMutant);
+		//System.out.println("Total #GeneratedAssertDetectedMutant: " + numOFGeneratedAssertDetectedMutant);
+
 
 	}
 
@@ -1331,8 +1335,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	// The following methods are helpers for the generated JUnit files
 
 	// To be used for executing added assertions for the experiments in the paper
-	public static boolean shouldConsiderAddedAssertion() {
-		return addNewAssertion;
+	public static boolean shouldAddAssertionsToExtendedSuite() {
+		return addAssertionsToExtendedSuite;
 	}
 
 	// To be used for calculating JS code coverage for the experiments in the paper
@@ -1340,9 +1344,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		return getCoverageReport;
 	}
 
-	
 
-	
+
+
 	/**
 	 *  Helpers for doing DOM-based mutation testing
 	 */
@@ -1351,13 +1355,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public static boolean shouldIgnoreAssertionFailure() {
 		return ignoreAndReportAssertionFailure;
 	}
-	
+
 	// To be used for DOM mutation testing for the experiments in the paper
 	public static String mutateDOMTreeCode() {
 		// generate code for DOM mutation
 		String jsCode = null;
 		//code = "var foo = document.getElementById('headerBar'); while (foo.firstChild) foo.removeChild(foo.firstChild);";
-		
+
 		// getting random DOM element
 		// getRandomObject(seed)  return document.getElementsByTagName('*')[Math.round(document.getElementsByTagName('*').length*seed/100)];
 
@@ -1374,12 +1378,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		        element.removeAttributeNode(element.attributes[i]);
 		}
 		removeAllAttrs(document.body);
-		*/
-		
+		 */
+
 		// remove text of element
 		// innerHTML
-		
-		
+
+
 		if (mutateDOM == true){
 			currentMutantIsKilled = false;
 			numOFGeneratedMutant++;
@@ -1387,13 +1391,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 		return null;
 	}
-	
+
 	// To be used for executing added assertions for the experiments in the paper
 	public static void verifyTrue(String assertionType, boolean assertionCondition) {
 		if (assertionCondition == false){
 			killMutant();
 		}
-		
+
 	}
 	public static void verifyEquals(String assertionType, String s1, String s2) {
 		if (!s1.equals(s2)){
