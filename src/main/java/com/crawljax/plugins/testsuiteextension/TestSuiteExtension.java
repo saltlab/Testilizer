@@ -88,7 +88,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	/**
 	 * Setting for my experiments
 	 */
-	static boolean addAssertionsToExtendedSuite = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addAssertionsToExtendedSuite = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
@@ -527,12 +527,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					// to distinguish original assertions from reused/generated ones
 					AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, elementLocator);
 					aep.setAssertionOrigin("original assertion");
-					if (!originalAssertedElementPatterns.contains(aep))
-						originalAssertedElementPatterns.add(aep);
+					//if (!originalAssertedElementPatterns.contains(aep))
+					originalAssertedElementPatterns.add(aep);
 					// adding assertion to the current DOM state in the SFG
-					firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
+					boolean assertionAdded = firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
 					// adding an AssertedElemetPattern-level assertion for the original assertion
-					firstConsumer.getContext().getCurrentState().addAssertedElementPattern(generatePatternAssertion(aep, "OriginalAssertedElemet")); 
+					if (assertionAdded)
+						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(generatePatternAssertion(aep, "OriginalAssertedElemet")); 
 
 					break;
 				default:
@@ -1003,7 +1004,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		String how, howValue, sendValue;
 
 		int counter = 0, totalAssertions = 0, actionableAssertions = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
-				ElementFullMatch = 0, ElementTagAttMatch = 0, ElementTagMatch = 0, PatternFullMatch = 0, PatternTagAttMatch = 0, PatternTagMatch = 0;
+				ElementFullMatch = 0, ElementTagAttMatch = 0, ElementTagMatch = 0, PatternFullMatch = 0, PatternTagAttMatch = 0, PatternTagMatch = 0, OriginalAssertedElemetAssertions=0;
 
 		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
 			//For each new sink node
@@ -1049,19 +1050,21 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							assertion.replace("assertNull(", toRelace);
 							 */
 
+							totalAssertions++;
 							if (assertionOringin.contains("original assertion")){
 								// Adding assertion to the method
 								testMethod.addStatement(assertion + "; // " + assertionOringin);
 								origAndReusedAssertions++;
-								totalAssertions++;
-							}else if (shouldAddAssertionsToExtendedSuite()){
+							}else if (shouldRunAssertionInExtendedSuite()){
 								// Adding assertion to the method
+								testMethod.addStatement("if (shouldRunAssertion()){");
 								testMethod.addStatement(assertion + "; // " + assertionOringin);
-								origAndReusedAssertions++;
+								testMethod.addStatement("}");
 								if (assertionOringin.contains("reused assertion")){
 									reusedAssertions++;
-									if (assertionOringin.contains("ElementFullMatch"))
+									if (assertionOringin.contains("ElementFullMatch")){
 										ElementFullMatch++;	
+									}
 								}else{
 									generatedAssertions++;
 									if (assertionOringin.contains("actionable"))
@@ -1076,6 +1079,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 										PatternTagAttMatch++;
 									if (assertionOringin.contains("PatternTagMatch"))
 										PatternTagMatch++;
+									if (assertionOringin.contains("OriginalAssertedElemet"))
+										OriginalAssertedElemetAssertions++;									
 								}
 							}
 
@@ -1175,6 +1180,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		System.out.println("Total #sink nodes:" + results.size());
 
+		
+		
+		
 		System.out.println("Total #assertions in the original test suite:" + originalAssertedElementPatterns.size());
 
 		System.out.println("Total #assertions in the test suite from happy paths (origAndReusedAssertions): " + origAndReusedAssertions);
@@ -1190,14 +1198,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("Total #generated assertions in the extended test suite: " + generatedAssertions);
 
 
-		System.out.println("Total #actionableAssertions: " + actionableAssertions);
 		System.out.println("Total #ElementFullMatch: " + ElementFullMatch);
 		System.out.println("Total #ElementTagAttMatch: " + ElementTagAttMatch);
 		System.out.println("Total #ElementTagMatch: " + ElementTagMatch);
 		System.out.println("Total #PatternFullMatch: " + PatternFullMatch);
 		System.out.println("Total #PatternTagAttMatch: " + PatternTagAttMatch);
 		System.out.println("Total #PatternTagMatch: " + PatternTagMatch);
+		System.out.println("Total #actionableAssertions: " + actionableAssertions);
+		System.out.println("Total #OriginalAssertedElemetAssertions: " + OriginalAssertedElemetAssertions);
 
+		
+		
 		// for the future work on higher order mutation
 		//System.out.println("Total #OrigAssertDetectedMutant: " + numOFOrigAssertDetectedMutant);
 		//System.out.println("Total #ReusedAssertDetectedMutant: " + numOFReusedAssertDetectedMutant);
@@ -1335,7 +1346,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	// The following methods are helpers for the generated JUnit files
 
 	// To be used for executing added assertions for the experiments in the paper
-	public static boolean shouldAddAssertionsToExtendedSuite() {
+	public static boolean shouldRunAssertionInExtendedSuite() {
 		return addAssertionsToExtendedSuite;
 	}
 
