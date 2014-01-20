@@ -2,6 +2,7 @@ package com.crawljax.plugins.testsuiteextension;
 
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -19,6 +20,7 @@ import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.tools.Diagnostic;
@@ -93,8 +95,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
 	// for mutation-testing both should be true
+	static boolean mutateDOM = true;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
+
 	static boolean ignoreAndReportAssertionFailure = true;  // on DOM-based mutation testing to evaluate effectiveness (default should be false)
-	static boolean mutateDOM = false;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
 	static boolean currentMutantIsKilled;
 	static int numOFGeneratedMutant = 0;
 	static int numOFKilledMutant = 0;
@@ -1032,6 +1035,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
 							String assertionOringin = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
 
+							// problem with Claroline app
+							if (edge.getSourceStateVertex().getId()==0 && assertion.equals("assertTrue(isElementPresent(By.linkText(\"Logout\")))"))
+								continue;
+
 							// Wrapping the original assert statements
 							/*String type = null;
 							if (assertionOringin.contains("original assertion"))
@@ -1369,38 +1376,50 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	// To be used for DOM mutation testing for the experiments in the paper
 	public static String mutateDOMTreeCode() {
-		// generate code for DOM mutation
-		String jsCode = null;
-		//code = "var foo = document.getElementById('headerBar'); while (foo.firstChild) foo.removeChild(foo.firstChild);";
-
-		// getting random DOM element
-		// getRandomObject(seed)  return document.getElementsByTagName('*')[Math.round(document.getElementsByTagName('*').length*seed/100)];
-
-		// remove parent and all children
-		// var x = document.getElementById('parent');  x.parentNode.removeChild(x);
-
-		// remove all children elements of a DOM node
-		// var foo = document.getElementById('foo');	while (foo.firstChild) foo.removeChild(foo.firstChild);
-
-		// remove all attributes of a DOM element
-		/* 
-		function removeAllAttrs(element) {
-		    for (var i= element.attributes.length; i-->0;)
-		        element.removeAttributeNode(element.attributes[i]);
+		if (mutateDOM == false)
+			return null;
+		
+		// This is done at random
+		Random randomGenerator = new Random();
+		double randVal = randomGenerator.nextDouble();
+		if (randVal < 0.5)
+			return null;
+		
+		/* DOM-based mutation operator
+			1) remove subtree
+			2) move subtree
+			3) remove subtree att
+			4) remove subtree text
+		*/
+		
+		int MutationOperatorCode = 4;
+		// generate code for DOM mutation, first choose a random DOM element
+		String jsCode = "randomElement = document.getElementsByTagName(\'*\')[Math.round(Math.random() * document.getElementsByTagName(\'*\').length)]; ";
+				
+		switch(MutationOperatorCode){
+		case 1:
+			// remove parent and all its children
+			jsCode += "randomElement.parentNode.removeChild(randomElement);";
+			break;
+		case 2:
+			// move subtree of a DOM node
+			jsCode += "anotherRandomElement = document.getElementsByTagName(\'*\')[Math.round(Math.random() * document.getElementsByTagName(\'*\').length)];";
+			jsCode += "anotherRandomElement.appendChild(randomElement);";
+			break;
+		case 3:
+			// remove attributes of of subtree of a DOM element
+			jsCode += "if ( randomElement.hasChildNodes() ) {  var children = randomElement.childNodes;  for (var i = 0; i < children.length; i++) {  if (children[i].hasAttributes()) { for (var j= children[i].attributes.length; j-->0;){ children[i].removeAttributeNode(children[i].attributes[j]); } } } }";
+			jsCode += "if ( randomElement.hasAttributes() ) { for (var i= randomElement.attributes.length; i-->0;){ randomElement.removeAttributeNode(randomElement.attributes[i]); }}";
+			break;
+		case 4:
+			// remove text of subtree of a DOM element
+			jsCode += "if ( randomElement.hasChildNodes() ) {  var children = randomElement.childNodes;  for (var i = 0; i < children.length; i++) {  children[i].innerHTML = \'\'; } }";
+			break;
 		}
-		removeAllAttrs(document.body);
-		 */
-
-		// remove text of element
-		// innerHTML
-
-
-		if (mutateDOM == true){
-			currentMutantIsKilled = false;
-			numOFGeneratedMutant++;
-			return jsCode;
-		}
-		return null;
+		System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
+		currentMutantIsKilled = false;
+		numOFGeneratedMutant++;
+		return jsCode;
 	}
 
 	// To be used for executing added assertions for the experiments in the paper
