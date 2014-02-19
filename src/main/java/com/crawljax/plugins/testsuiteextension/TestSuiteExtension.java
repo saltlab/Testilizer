@@ -554,8 +554,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(generatePatternAssertion(aep, "OriginalAssertedElemet")); 
 
 					
-					// Adding feature vector of the asserted element with label +1 to be used for training the SVM
-					firstConsumer.getContext().getCurrentState().addElementFeatures(getAssertedElemFeatureVector(webElement));
+					// Generate feature vector of the asserted element with label +1 and save in the training dataset file to be used for training the SVM
+					addToTrainingSet(getAssertedElemFeatureVector(webElement));
 					
 					break;
 				default:
@@ -578,6 +578,32 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	}
 	
+	private void addToTrainingSet(ElementFeatures elemFeatureVector) {
+		// Dumping the feature vectore of asserted element into training dataset
+		// sample data format: <label> <featureIndex>:<featureValue>. E.g: +1 1:0.708333 2:1 3:1 4:-0.320755 5:-0.105023 ...
+		String sample = elemFeatureVector.getClassLabel() + 
+				" 1:" + elemFeatureVector.getFreshness() +
+				" 2:" + elemFeatureVector.getTextImportance() +
+				" 3:" + elemFeatureVector.getNormalBlockWidth() +
+				" 4:" + elemFeatureVector.getNormalBlockHeight() +
+				" 5:" + elemFeatureVector.getNormalBlockCenterX() +
+				" 6:" + elemFeatureVector.getNormalBlockCenterY() +
+				" 7:" + elemFeatureVector.getInnerHtmlDensity() +
+				" 8:" + elemFeatureVector.getLinkDensity() +
+				" 9:" + elemFeatureVector.getBlockDensity();
+		try {
+			FileWriter fw = new FileWriter("trainingSet.txt", true); //appending new data
+			fw.write(sample + "\n");
+			fw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.err.println("IOException: " + e.getMessage());
+		}
+		
+		
+	}
+
+
 	private ElementFeatures getAssertedElemFeatureVector(WebElement assertedElement) {
 		String[] blockTags = {"/div>", "/span>", "/p>", "/table>"};
 		//String[] listTags = {"/ul>", "/ol>", "/li>"};
@@ -617,8 +643,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		// extract info from the blocks
 		int classLabel = 1;	// since it is an asserted element
-		boolean freshness = false;
-		boolean textImportance = false;
+		int freshness = 0, textImportance = 0; // 0: false
 		String blockInnerHTML = assertedElement.getAttribute("innerHTML");
 		double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
 		
@@ -664,7 +689,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		for (int i=0; i<phraseTags.length; i++){
 			if (blockInnerHTML.contains(phraseTags[i])){
-				textImportance = true;
+				textImportance = 1;
 				break;
 			}
 		}
@@ -724,8 +749,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		for (WebElement block: blockElements){
 
 			int classLabel = 0; // This means that these vectors are not going to be used for SVM training, they are stored to be used later for prediction step.
-			boolean freshness = false;
-			boolean textImportance = false;
+			int freshness = 0, textImportance = 0; // 0: false
 			String blockInnerHTML = block.getAttribute("innerHTML");
 			double innerHtmlDensity = blockInnerHTML.length() / bodyInnerHTML.length();
 			double linkDensity = blockInnerHTML.length() / totalLinksCount; // WRONG! Double check everything!!!
@@ -739,7 +763,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			
 			for (int i=0; i<phraseTags.length; i++){
 				if (blockInnerHTML.contains(phraseTags[i])){
-					textImportance = true;
+					textImportance = 1;
 					break;
 				}
 			}
