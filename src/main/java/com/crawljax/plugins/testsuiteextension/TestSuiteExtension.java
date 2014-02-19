@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -43,6 +45,7 @@ import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 
@@ -77,6 +80,7 @@ import com.crawljax.util.AssertedElementPattern;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.util.DomUtils;
+import com.crawljax.util.ElementFeatures;
 import com.crawljax.util.XPathHelper;
 import com.google.common.collect.ImmutableList;
 
@@ -90,12 +94,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	/**
 	 * Setting for my experiments
 	 */
+	//String appName = "claroline";
+	//String appName = "photogallery";
+	String appName = "pizza";
 	static boolean addAssertionsToExtendedSuite = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
 	// for mutation-testing both should be true
-	static boolean mutateDOM = true;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
+	static boolean mutateDOM = false;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
 
 	static boolean ignoreAndReportAssertionFailure = true;  // on DOM-based mutation testing to evaluate effectiveness (default should be false)
 	static boolean currentMutantIsKilled;
@@ -148,8 +155,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		/**
 		 * (1) Instrumenting original Selenium unit test files
 		 */
-		//String appName = "claroline";
-		String appName = "photogallery";
 
 		String originalFolderLoc = System.getProperty("user.dir");
 		// On Linux/Mac
@@ -195,6 +200,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}
 		});
 
+		
+		/*
 		LOG.info(System.getProperty("java.home"));
 		//Not set on my Mac
 		System.setProperty("java.home", "C:\\Program Files\\Java\\jdk1.7.0_05");
@@ -220,8 +227,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		*/
 
 		// Not set on my Mac
+		boolean success = true;
 		if(success){
 			// Executing the instrumented unit test files. This will produce a log of the execution trace
 			LOG.info("Instrumenting unit test files and logging the execution trace...");
@@ -414,6 +423,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						System.out.println("event: " + event);
 
 
+						/* Removed form the FSE version
 						// creating assertion to check existence of the clickable element
 						String xpath = getXPath(webElement);
 						org.w3c.dom.Element clikcedElement = null;
@@ -429,7 +439,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						aep.setAssertionOrigin("generated assertion in case of actionable element");
 						// adding assertion to the current DOM state in the SFG
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
-
+						*/
 
 						//System.out.println("setting form inputs with: " + relatedFormInputs);
 						CopyOnWriteArrayList<FormInput> relatedFormInputsCopy = new CopyOnWriteArrayList<FormInput>();
@@ -448,9 +458,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						// Applying the click with the form input values
 						boolean fired = firstConsumer.getCrawler().fireEvent(event);
 
-						if (fired)
+						if (fired){
 							// inspecting DOM changes and adding to SFG
 							firstConsumer.getCrawler().inspectNewStateForInitailPaths(event);
+
+							// Adding feature vector of all block DOM elements to be later used for prediction when SVM is trained
+							addDOMElementsFeatures(firstConsumer.getContext().getCurrentState());
+						}
+
 						else
 							LOG.info("webElement {} not clicked because not all crawl conditions where satisfied",	webElement);
 
@@ -538,6 +553,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					if (assertionAdded)
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(generatePatternAssertion(aep, "OriginalAssertedElemet")); 
 
+					
+					// Adding feature vector of the asserted element with label +1 to be used for training the SVM
+					firstConsumer.getContext().getCurrentState().addElementFeatures(getAssertedElemFeatureVector(webElement));
+					
 					break;
 				default:
 				}
@@ -558,7 +577,184 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		//saveSFG(session);
 
 	}
+	
+	private ElementFeatures getAssertedElemFeatureVector(WebElement assertedElement) {
+		String[] blockTags = {"/div>", "/span>", "/p>", "/table>"};
+		//String[] listTags = {"/ul>", "/ol>", "/li>"};
+		String[] tableTags = {"/table>", "/tr>"};
+		String[] linkTags = {"/a>"};
+		String[] phraseTags = {"/b>", "/h1>", "/h2>", "/h3>", "/h4>", "/h5>", "/h1>", "/i>", "/em>", "/strong>", "/dfn>", "/code>", "/samp>", "/kbd>", "/var>"};
+		int totalBlocksCount = 0, totalLinksCount = 0, totalTablesCount = 0;
 
+		// extract info from the <body> part
+		WebElement body = browser.getBrowser().findElements(By.tagName("body")).get(0);
+
+		String bodyInnerHTML = body.getAttribute("innerHTML");
+		double bodyWidth = (double) body.getSize().getWidth();
+		double bodyHeight = (double) body.getSize().getHeight();
+
+		for (int i=0; i<blockTags.length; i++){
+			Pattern p = Pattern.compile(blockTags[i]);
+			Matcher m = p.matcher(bodyInnerHTML);
+			while (m.find())
+				totalBlocksCount +=1;
+			//System.out.println(totalBlocksCount);
+		}	
+		for (int i=0; i<linkTags.length; i++){
+			Pattern p = Pattern.compile(linkTags[i]);
+			Matcher m = p.matcher(bodyInnerHTML);
+			while (m.find())
+				totalLinksCount +=1;
+			//System.out.println(totalLinksCount);
+		}
+		for (int i=0; i<tableTags.length; i++){
+			Pattern p = Pattern.compile(tableTags[i]);
+			Matcher m = p.matcher(bodyInnerHTML);
+			while (m.find())
+				totalTablesCount +=1;
+			//System.out.println(totalTablesCount);
+		}
+
+		// extract info from the blocks
+		int classLabel = 1;	// since it is an asserted element
+		boolean freshness = false;
+		boolean textImportance = false;
+		String blockInnerHTML = assertedElement.getAttribute("innerHTML");
+		double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
+		
+		double blockXPos = (double) assertedElement.getLocation().getX();
+		double blockYPos = (double) assertedElement.getLocation().getY();
+		double blockWidth = (double) assertedElement.getSize().getWidth();
+		double blockHeight = (double) assertedElement.getSize().getHeight();
+		
+		double normalBlockWidth = blockWidth / bodyWidth;
+		double normalBlockHeight = blockHeight / bodyHeight;
+		double normalBlockCenterX = (blockXPos + blockWidth/2) / bodyWidth;
+		double normalBlockCenterY = (blockYPos + blockHeight/2) / bodyHeight;
+
+		int blockBlocksCount = 0, blockLinksCount = 0, blockTablesCount = 0;
+		for (int i=0; i<blockTags.length; i++){
+			Pattern p = Pattern.compile(blockTags[i]);
+			Matcher m = p.matcher(blockInnerHTML);
+			while (m.find())
+				blockBlocksCount +=1;
+			//System.out.println(blockBlocksCount);
+		}	
+		for (int i=0; i<linkTags.length; i++){
+			Pattern p = Pattern.compile(linkTags[i]);
+			Matcher m = p.matcher(blockInnerHTML);
+			while (m.find())
+				blockLinksCount +=1;
+			//System.out.println(blockLinksCount);
+		}
+		for (int i=0; i<tableTags.length; i++){
+			Pattern p = Pattern.compile(tableTags[i]);
+			Matcher m = p.matcher(blockInnerHTML);
+			while (m.find())
+				blockTablesCount +=1;
+			//System.out.println(blockTablesCount);
+		}
+		double linkDensity = 0;
+		if (totalLinksCount!=0)
+			linkDensity = (double)blockLinksCount / (double)totalLinksCount;
+		double blockDensity = 0;
+		if (totalBlocksCount!=0)
+			blockDensity = (double)blockBlocksCount / (double)totalBlocksCount;
+
+
+		for (int i=0; i<phraseTags.length; i++){
+			if (blockInnerHTML.contains(phraseTags[i])){
+				textImportance = true;
+				break;
+			}
+		}
+
+		
+		ElementFeatures elementFeatures = new ElementFeatures(freshness, textImportance, normalBlockWidth, normalBlockHeight, 
+				normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
+
+		System.out.println("features for element " + assertedElement + " is: " + elementFeatures);
+		return elementFeatures;
+	}
+
+
+	private void addDOMElementsFeatures(StateVertex stateVertex) {
+		String[] blockTags = {"/div>", "/span>", "/p>", "/tr>"};
+		String[] tableTags = {"/table>", "/tr>", "/td>"};
+		String[] linkTags = {"/a>"};
+		String[] phraseTags = {"/b>", "/h1>", "/h2>", "/h3>", "/h4>", "/h5>", "/h1>", "/i>", "/em>", "/strong>", "/dfn>", "/code>", "/samp>", "/kbd>", "/var>"};
+		int totalBlocksCount = 0, totalLinksCount = 0, totalTablesCount = 0;
+
+		if (true) return;
+		
+		// extract info from the <body> part
+		WebElement body = browser.getBrowser().findElements(By.tagName("body")).get(0);
+
+		String bodyInnerHTML = body.getAttribute("innerHTML");
+		int bodyWidth = body.getSize().getWidth();
+		int bodyHeight = body.getSize().getHeight();
+
+		for (int i=0; i<blockTags.length; i++){
+			Pattern p = Pattern.compile(blockTags[i]);
+			Matcher m = p.matcher(bodyInnerHTML);
+			while (m.find()){
+				totalBlocksCount +=1;
+			}
+			System.out.println(totalBlocksCount);
+		}	
+		for (int i=0; i<linkTags.length; i++){
+			Pattern p = Pattern.compile(linkTags[i]);
+			Matcher m = p.matcher(bodyInnerHTML);
+			while (m.find()){
+				totalLinksCount +=1;
+			}
+			System.out.println(totalLinksCount);
+		}
+		for (int i=0; i<tableTags.length; i++){
+			Pattern p = Pattern.compile(tableTags[i]);
+			Matcher m = p.matcher(bodyInnerHTML);
+			while (m.find()){
+				totalTablesCount +=1;
+			}
+			System.out.println(totalTablesCount);
+		}
+
+		// extract info from the block elements
+		List<WebElement> blockElements = browser.getBrowser().findElements(By.tagName("div"));
+		for (WebElement block: blockElements){
+
+			int classLabel = 0; // This means that these vectors are not going to be used for SVM training, they are stored to be used later for prediction step.
+			boolean freshness = false;
+			boolean textImportance = false;
+			String blockInnerHTML = block.getAttribute("innerHTML");
+			double innerHtmlDensity = blockInnerHTML.length() / bodyInnerHTML.length();
+			double linkDensity = blockInnerHTML.length() / totalLinksCount; // WRONG! Double check everything!!!
+			double blockDensity = blockInnerHTML.length() / totalBlocksCount;
+			int blockXPos = block.getLocation().getX();
+			int blockYPos = block.getLocation().getY();
+			double normalBlockWidth = block.getSize().getWidth() / bodyWidth;
+			double normalBlockHeight = block.getSize().getHeight() / bodyHeight;
+			double normalBlockCenterX = (blockXPos + block.getSize().getWidth()/2) / bodyWidth;
+			double normalBlockCenterY = (blockYPos + block.getSize().getHeight()/2) / bodyHeight;	
+			
+			for (int i=0; i<phraseTags.length; i++){
+				if (blockInnerHTML.contains(phraseTags[i])){
+					textImportance = true;
+					break;
+				}
+			}
+			
+			ElementFeatures elementFeatures = new ElementFeatures(freshness, textImportance, normalBlockWidth, normalBlockHeight, 
+					normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
+
+			System.out.println("features for element " + block + " is: " + elementFeatures);
+			// add the feature vector to the state
+			stateVertex.addElementFeatures(elementFeatures);
+		}
+	}
+
+	
+	
 	private void saveSFG(CrawlSession session) {
 		LOG.info("Saving the SFG based on executed Selenium test cases...");
 		StateFlowGraph sfg = session.getStateFlowGraph();
@@ -851,11 +1047,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								//System.out.println("ElementTagAttMatch");
 								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
 								break;
-							case "ElementTagMatch":
+							//case "ElementTagMatch":
 								//System.out.println(aep);
 								//System.out.println("ElementTagMatch");
-								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
-								break;
+								//s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
+								//break;
 							}
 
 							// AssertedElementPattern-Level Assertion
@@ -891,6 +1087,28 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			//	for (int i=0;i<s.getAssertions().size();i++)
 			//		System.out.println(s.getAssertions().get(i));
 			//}
+
+
+			// Amin: TODO
+			// suppressing redundant assertions
+			/*ArrayList<AssertedElementPattern> AEP = s.getAssertedElementPatters();
+			ArrayList<AssertedElementPattern> toRemove = new ArrayList<AssertedElementPattern>();
+
+
+			Element tempElement;
+			for (int i=0;i<AEP.size();i++)
+				for (int j=0;j<AEP.size();j++){
+					if (i!=j){
+						if (AEP.get(i).getSourceElement()==AEP.get(j).getSourceElement());
+						while (AEP.get(i).getSourceElement().getParentNode().getNodeName().toUpperCase()!="BODY")
+						
+						
+						tempElement = tempElement.getParentNode();
+					}
+				}
+			*/
+
+
 		}
 
 		generateTestSuite(session);
@@ -1273,6 +1491,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		if (true)
 			return;
 
+		// bypass or select random if error occured or coverage impact is negative
+		
 		// Calculate initial code coverage for the index page to be used by Feedex
 		if (vertex.getId() == vertex.INDEX_ID){
 			for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
@@ -1392,7 +1612,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			4) remove subtree text
 		*/
 		
-		int MutationOperatorCode = 4;
+		int MutationOperatorCode = 3;
 		// generate code for DOM mutation, first choose a random DOM element
 		String jsCode = "randomElement = document.getElementsByTagName(\'*\')[Math.round(Math.random() * document.getElementsByTagName(\'*\').length)]; ";
 				
@@ -1416,7 +1636,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			jsCode += "if ( randomElement.hasChildNodes() ) {  var children = randomElement.childNodes;  for (var i = 0; i < children.length; i++) {  children[i].innerHTML = \'\'; } }";
 			break;
 		}
-		System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
+		//System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
 		currentMutantIsKilled = false;
 		numOFGeneratedMutant++;
 		return jsCode;

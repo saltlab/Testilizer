@@ -58,6 +58,10 @@ public class SeleniumInstrumentor {
 
 	public static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
 
+	//String appName = "claroline";
+	String appName = "photogallery";
+	
+	
 	public SeleniumInstrumentor() {
 	}
 
@@ -192,8 +196,7 @@ public class SeleniumInstrumentor {
 			}				
 		
 			if (writeBack == true){
-				//String appName = "claroline";
-				String appName = "photogallery";
+
 				
 				String newFileLoc = System.getProperty("user.dir");
 				// On Linux/Mac			
