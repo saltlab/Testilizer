@@ -4,11 +4,15 @@ package com.crawljax.plugins.testsuiteextension;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -21,6 +25,7 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.StringTokenizer;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -35,6 +40,11 @@ import javax.xml.xpath.XPathFactory;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
+
+import libsvm.svm;
+import libsvm.svm_model;
+import libsvm.svm_node;
+import libsvm.svm_parameter;
 
 
 import org.jgrapht.GraphPath;
@@ -74,6 +84,8 @@ import com.crawljax.forms.FormInput;
 import com.crawljax.forms.RandomInputValueGenerator;
 import com.crawljax.plugins.testsuiteextension.jsinstrumentor.JSModifyProxyPlugin;
 import com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor;
+import com.crawljax.plugins.testsuiteextension.svm.svm_predict;
+import com.crawljax.plugins.testsuiteextension.svm.svm_train;
 import com.crawljax.plugins.testsuiteextension.testcasegenerator.JavaTestGenerator;
 import com.crawljax.plugins.testsuiteextension.testcasegenerator.TestMethod;
 import com.crawljax.util.AssertedElementPattern;
@@ -581,16 +593,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	private void addToTrainingSet(ElementFeatures elemFeatureVector) {
 		// Dumping the feature vectore of asserted element into training dataset
 		// sample data format: <label> <featureIndex>:<featureValue>. E.g: +1 1:0.708333 2:1 3:1 4:-0.320755 5:-0.105023 ...
-		String sample = elemFeatureVector.getClassLabel() + 
+		String label = elemFeatureVector.getClassLabel()>0 ? "+1" : "-1";
+		String sample = label + 
 				" 1:" + elemFeatureVector.getFreshness() +
 				" 2:" + elemFeatureVector.getTextImportance() +
-				" 3:" + elemFeatureVector.getNormalBlockWidth() +
-				" 4:" + elemFeatureVector.getNormalBlockHeight() +
-				" 5:" + elemFeatureVector.getNormalBlockCenterX() +
-				" 6:" + elemFeatureVector.getNormalBlockCenterY() +
-				" 7:" + elemFeatureVector.getInnerHtmlDensity() +
-				" 8:" + elemFeatureVector.getLinkDensity() +
-				" 9:" + elemFeatureVector.getBlockDensity();
+				" 3:" + String.format("%.3f", elemFeatureVector.getNormalBlockWidth()) +
+				" 4:" + String.format("%.3f", elemFeatureVector.getNormalBlockHeight()) +
+				" 5:" + String.format("%.3f", elemFeatureVector.getNormalBlockCenterX()) +
+				" 6:" + String.format("%.3f", elemFeatureVector.getNormalBlockCenterY()) +
+				" 7:" + String.format("%.3f", elemFeatureVector.getInnerHtmlDensity()) +
+				" 8:" + String.format("%.3f", elemFeatureVector.getLinkDensity()) +
+				" 9:" + String.format("%.3f", elemFeatureVector.getBlockDensity());
 		try {
 			FileWriter fw = new FileWriter("trainingSet.txt", true); //appending new data
 			fw.write(sample + "\n");
@@ -1029,6 +1042,90 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		StateFlowGraph sfg = session.getStateFlowGraph();
 
+		System.out.println("Training the SVM for assertion prediction...");
+		
+		
+		// SVM training
+		String arguments[] = {"trainingSet.txt"};
+		svm_train t = new svm_train();
+		t.run(arguments);
+
+		
+		// SVM predicting
+		String argv[] = {"heart_scale", "heart_scale.model", "output"};
+		int i=0, predict_probability=0;
+		try 
+		{
+			BufferedReader input = new BufferedReader(new FileReader(argv[i]));
+			DataOutputStream output = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(argv[i+2])));
+			svm_model model = svm.svm_load_model(argv[i+1]);
+
+			// predict(input,output,model,predict_probability);
+
+			int correct = 0;
+			int total = 0;
+			double error = 0;
+			double sumv = 0, sumy = 0, sumvv = 0, sumyy = 0, sumvy = 0;
+
+			int svm_type=svm.svm_get_svm_type(model);
+			int nr_class=svm.svm_get_nr_class(model);
+			double[] prob_estimates=null;
+
+			while(true)
+			{
+				String line = input.readLine();
+				if(line == null) break;
+
+				StringTokenizer st = new StringTokenizer(line," \t\n\r\f:");
+
+				double target = Double.valueOf(st.nextToken()).doubleValue();
+				int m = st.countTokens()/2;
+				svm_node[] x = new svm_node[m];
+				for(int j=0;j<m;j++)
+				{
+					x[j] = new svm_node();
+					x[j].index = Integer.parseInt(st.nextToken());
+					x[j].value = Double.valueOf(st.nextToken()).doubleValue();
+				}
+
+				double v;
+				v = svm.svm_predict(model,x);
+				output.writeBytes(v+"\n");
+
+				if(v == target)
+					++correct;
+				error += (v-target)*(v-target);
+				sumv += v;
+				sumy += target;
+				sumvv += v*v;
+				sumyy += target*target;
+				sumvy += v*target;
+				++total;
+			}
+			
+			svm_predict.info("Accuracy = "+(double)correct/total*100+"% ("+correct+"/"+total+") (classification)\n");
+
+
+
+
+			input.close();
+			output.close();
+		} 
+		catch(FileNotFoundException e) 
+		{
+		}
+		catch(ArrayIndexOutOfBoundsException e) 
+		{
+		}
+
+		
+		
+		
+		
+		
+		
+		
+		
 		// DOM-based assertion generation part
 		for (StateVertex s: sfg.getAllStates()){
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));

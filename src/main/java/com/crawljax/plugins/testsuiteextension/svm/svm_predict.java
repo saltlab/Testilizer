@@ -3,7 +3,7 @@ import libsvm.*;
 import java.io.*;
 import java.util.*;
 
-class svm_predict {
+public class svm_predict {
 	private static svm_print_interface svm_print_null = new svm_print_interface()
 	{
 		public void print(String s) {}
@@ -19,7 +19,7 @@ class svm_predict {
 
 	private static svm_print_interface svm_print_string = svm_print_stdout;
 
-	static void info(String s) 
+	public static void info(String s) 
 	{
 		svm_print_string.print(s);
 	}

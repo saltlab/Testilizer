@@ -3,7 +3,7 @@ import libsvm.*;
 import java.io.*;
 import java.util.*;
 
-class svm_train {
+public class svm_train {
 	private svm_parameter param;		// set by parse_command_line
 	private svm_problem prob;		// set by read_problem
 	private svm_model model;
@@ -90,7 +90,7 @@ class svm_train {
 		}
 	}
 	
-	private void run(String argv[]) throws IOException
+	public void run(String argv[]) throws IOException
 	{
 		parse_command_line(argv);
 		read_problem();
