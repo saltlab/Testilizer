@@ -121,6 +121,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	// SVM training set
 	HashSet<ElementFeatures> trainingSetElementFeatures = new HashSet<ElementFeatures>();
+	HashSet<ElementFeatures> freshBlockElementFeatures = new HashSet<ElementFeatures>(); // block elements in the current state which were not in the previous state
 
 
 
@@ -432,24 +433,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						System.out.println("event: " + event);
 
 
-						/* Removed form the FSE version
-						// creating assertion to check existence of the clickable element
-						String xpath = getXPath(webElement);
-						org.w3c.dom.Element clikcedElement = null;
-						try {
-							clikcedElement = getElementFromXpath(xpath, browser);
-							System.out.println("The assertedSourceElement is: " + clikcedElement);
-						} catch (XPathExpressionException e) {
-							System.out.println("XPathExpressionException!");
-							e.printStackTrace();
-						}
-						AssertedElementPattern aep = new AssertedElementPattern(clikcedElement, "", elementLocator);
-						aep.setAssertion("assertTrue(isElementPresent("+ aep.getAssertedElementLocator() +"))");
-						aep.setAssertionOrigin("generated assertion in case of actionable element");
-						// adding assertion to the current DOM state in the SFG
-						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
-						*/
-
 						//System.out.println("setting form inputs with: " + relatedFormInputs);
 						CopyOnWriteArrayList<FormInput> relatedFormInputsCopy = new CopyOnWriteArrayList<FormInput>();
 						relatedFormInputsCopy.addAll(relatedFormInputs);
@@ -472,7 +455,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							firstConsumer.getCrawler().inspectNewStateForInitailPaths(event);
 
 							// Adding feature vector of block DOM elements with label -1 to be used for training the SVM.
-							ArrayList<ElementFeatures> DOMElementsFeatures = addDOMElementsFeatures(false);
+							ArrayList<ElementFeatures> DOMElementsFeatures = getDOMElementsFeatures(false);
 							for (ElementFeatures ef: DOMElementsFeatures)
 								trainingSetElementFeatures.add(ef);
 							
@@ -718,7 +701,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	private ArrayList<ElementFeatures> addDOMElementsFeatures(boolean isAlternativeState) {
+	private ArrayList<ElementFeatures> getDOMElementsFeatures(boolean isAlternativeState) {
 
 		//if (true) return;
 		
@@ -728,7 +711,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		
 		if (isAlternativeState==true)
 			classLabel = 0;		// These vectors are not going to be used for SVM training, they are stored to be used later for prediction step.
-
 		
 		String[] blockTags = {"/div>", "/span>", "/p>", "/table>"};
 		//String[] listTags = {"/ul>", "/ol>", "/li>"};
@@ -770,7 +752,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		
 		// TODO: extract info from the block elements (div, span, p, and table)
 
-		// TODO: calcule fresshness based on previos state. If was not found in the previous state it is a new element
+		// fresshness will be calculated based on previous state. If was not found in the previous state it is a new element
 		int freshness = 0, textImportance = 0; // 1: true, 0: false
 
 		List<WebElement> blockElements = browser.getBrowser().findElements(By.tagName("div"));
@@ -1221,8 +1203,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			//}
 
 
-			// Amin: TODO
-			// suppressing redundant assertions
+			// **************TODO: suppressing redundant assertions ***********
 			/*ArrayList<AssertedElementPattern> AEP = s.getAssertedElementPatters();
 			ArrayList<AssertedElementPattern> toRemove = new ArrayList<AssertedElementPattern>();
 
@@ -1563,15 +1544,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("Total #PatternTagMatch: " + PatternTagMatch);
 		System.out.println("Total #actionableAssertions: " + actionableAssertions);
 		System.out.println("Total #OriginalAssertedElemetAssertions: " + OriginalAssertedElemetAssertions);
-
-		
-		
-		// for the future work on higher order mutation
-		//System.out.println("Total #OrigAssertDetectedMutant: " + numOFOrigAssertDetectedMutant);
-		//System.out.println("Total #ReusedAssertDetectedMutant: " + numOFReusedAssertDetectedMutant);
-		//System.out.println("Total #GeneratedAssertDetectedMutant: " + numOFGeneratedAssertDetectedMutant);
-
-
+	
 	}
 
 
@@ -1586,7 +1559,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		// TODO Reset for crawling from states in the happy paths
 	}
 
-	/**
+	/*
 	 * After a successful event firing, calculate the code coverage
 	 */
 	@Override
@@ -1617,7 +1590,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 
 		// Getting feature vector of block DOM elements with label 0 to be predicted by the trained SVM.
-		ArrayList<ElementFeatures> DOMElementsFeatures = addDOMElementsFeatures(true);
+		ArrayList<ElementFeatures> DOMElementsFeatures = getDOMElementsFeatures(true);
 		// Adding feature vectors to the state
 		for (ElementFeatures ef: DOMElementsFeatures) 
 			vertex.addElementFeatures(ef);
@@ -1700,7 +1673,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 
-	// The following methods are helpers for the generated JUnit files
+	/*
+	 * The following methods are helpers for the generated JUnit files
+	 */
 
 	// To be used for executing added assertions for the experiments in the paper
 	public static boolean shouldRunAssertionInExtendedSuite() {
@@ -1720,7 +1695,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public boolean isDomChanged(CrawlerContext context, StateVertex stateBefore, Eventable e, StateVertex stateAfter) {
 		// Detecting which elements are fresh (are in the current DOM state but not in the previous DOM state) 
-		// extract all block elements
+		// extract all block elements, generate featurte vectors, determine new ones, add those with freshnes = 1 to set of freshElement
+		
+		ArrayList<ElementFeatures> oldElementsFeatures = stateBefore.getElementFeatures();
+		// since adding features to stateAfter will be done on OnNewState plugin which is after DOMChangeNotifier, we need to get features from browser at this step.
+		ArrayList<ElementFeatures> newElementsFeatures = getDOMElementsFeatures(true);
+		// Adding feature vectors to the state
+		for (ElementFeatures ef: newElementsFeatures)
+			if (oldElementsFeatures)
+			freshBlockElementFeatures.add(ef);
+		
+		
 		
 		return defaultDomComparison(stateBefore, stateAfter);
 	}	
