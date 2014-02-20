@@ -21,6 +21,7 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -102,14 +103,13 @@ import com.google.common.collect.ImmutableList;
  * It initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.
  **/
 public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
-PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, OnRevisitStatePlugin, DomChangeNotifierPlugin{
+PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomChangeNotifierPlugin{
 
 	/**
 	 * Setting for my experiments
 	 */
-	//String appName = "claroline";
+	String appName = "claroline";
 	//String appName = "photogallery";
-	String appName = "pizza";
 	static boolean addAssertionsToExtendedSuite = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
@@ -118,13 +118,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	static boolean mutateDOM = false;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
 
 	static boolean ignoreAndReportAssertionFailure = true;  // on DOM-based mutation testing to evaluate effectiveness (default should be false)
-	static boolean currentMutantIsKilled;
-	static int numOFGeneratedMutant = 0;
-	static int numOFKilledMutant = 0;
-	static int numOFOrigAssertDetectedMutant = 0;
-	static int numOFReusedAssertDetectedMutant = 0;
-	static int numOFGeneratedAssertDetectedMutant = 0;
 
+	// SVM training set
+	HashSet<ElementFeatures> trainingSetElementFeatures = new HashSet<ElementFeatures>();
 
 
 
@@ -476,7 +472,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							firstConsumer.getCrawler().inspectNewStateForInitailPaths(event);
 
 							// Adding feature vector of block DOM elements with label -1 to be used for training the SVM.
-							addDOMElementsFeatures(firstConsumer.getContext(), false);
+							ArrayList<ElementFeatures> DOMElementsFeatures = addDOMElementsFeatures(false);
+							for (ElementFeatures ef: DOMElementsFeatures)
+								trainingSetElementFeatures.add(ef);
+							
 						}
 
 						else
@@ -554,8 +553,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							e.printStackTrace();
 						}
 						
-						// Generate feature vector of the asserted element with label +1 and save in the training dataset file to be used for training the SVM
-						addToTrainingSet(getAssertedElemFeatureVector(webElement));
+						// Generate feature vector of the asserted element with label +1 to be used for training the SVM
+						trainingSetElementFeatures.add(getAssertedElemFeatureVector(webElement));
 
 					}
 
@@ -719,13 +718,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	private void addDOMElementsFeatures(CrawlerContext context, boolean isAlternativeState) {
+	private ArrayList<ElementFeatures> addDOMElementsFeatures(boolean isAlternativeState) {
 
 		//if (true) return;
-
-		StateVertex currentState = context.getCurrentState();
-		StateVertex currentState = context.getCurrentState();
 		
+		ArrayList<ElementFeatures> DOMElementsFeatures = new ArrayList<ElementFeatures>();
+
 		int classLabel = -1;	// Default for block elements on manual-test states
 		
 		if (isAlternativeState==true)
@@ -770,12 +768,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		
 		
 		
-		
-		int freshness = 0, textImportance = 0; // 1: true, 0: false
-		
-		// TODO: calcule fresshness based on previos state. If was not found in the previous state it is a new element
-
 		// TODO: extract info from the block elements (div, span, p, and table)
+
+		// TODO: calcule fresshness based on previos state. If was not found in the previous state it is a new element
+		int freshness = 0, textImportance = 0; // 1: true, 0: false
 
 		List<WebElement> blockElements = browser.getBrowser().findElements(By.tagName("div"));
 		for (WebElement block: blockElements){
@@ -830,11 +826,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			System.out.println("features for element " + block + " is: " + elementFeatures);
 			
-			if (isAlternativeState==false) // should be changed to add to state set first and later dumo in file to remove redundant ones
-				 addToTrainingSet(elementFeatures); 
-			else // add the feature vector to the state
-				currentState.addElementFeatures(elementFeatures);
+			DOMElementsFeatures.add(elementFeatures);
+			
 		}
+		return DOMElementsFeatures;
 	}
 
 	
@@ -1090,7 +1085,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		StateFlowGraph sfg = session.getStateFlowGraph();
 
 		System.out.println("Training the SVM for assertion prediction...");
-		
+		// writing from the HashSet to training set file
+		for (ElementFeatures ef: trainingSetElementFeatures)
+			addToTrainingSet(ef);
 		
 		// SVM training, generates trainingSet.model file
 		String arguments[] = {"trainingSet"};
@@ -1619,10 +1616,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 
-		// Adding feature vector of block DOM elements with label 0 to be predicted by the trained SVM.
-		addDOMElementsFeatures(context, true);
-		
-		
+		// Getting feature vector of block DOM elements with label 0 to be predicted by the trained SVM.
+		ArrayList<ElementFeatures> DOMElementsFeatures = addDOMElementsFeatures(true);
+		// Adding feature vectors to the state
+		for (ElementFeatures ef: DOMElementsFeatures) 
+			vertex.addElementFeatures(ef);
+
 		
 		
 		if (true)
@@ -1700,12 +1699,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	@Override
-	public void onRevisitState(CrawlerContext context, StateVertex currentState) {
-		// TODO: check the assertions from test suite
-	}
-
-
 
 	// The following methods are helpers for the generated JUnit files
 
@@ -1719,108 +1712,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		return getCoverageReport;
 	}
 
-
-
-
-	/**
-	 *  Helpers for doing DOM-based mutation testing
-	 */
-
 	// To be used for executing added assertions for the experiments in the paper
 	public static boolean shouldIgnoreAssertionFailure() {
 		return ignoreAndReportAssertionFailure;
 	}
 
-	// To be used for DOM mutation testing for the experiments in the paper
-	public static String mutateDOMTreeCode() {
-		if (mutateDOM == false)
-			return null;
-		
-		// This is done at random
-		Random randomGenerator = new Random();
-		double randVal = randomGenerator.nextDouble();
-		if (randVal < 0.5)
-			return null;
-		
-		/* DOM-based mutation operator
-			1) remove subtree
-			2) move subtree
-			3) remove subtree att
-			4) remove subtree text
-		*/
-		
-		int MutationOperatorCode = 3;
-		// generate code for DOM mutation, first choose a random DOM element
-		String jsCode = "randomElement = document.getElementsByTagName(\'*\')[Math.round(Math.random() * document.getElementsByTagName(\'*\').length)]; ";
-				
-		switch(MutationOperatorCode){
-		case 1:
-			// remove parent and all its children
-			jsCode += "randomElement.parentNode.removeChild(randomElement);";
-			break;
-		case 2:
-			// move subtree of a DOM node
-			jsCode += "anotherRandomElement = document.getElementsByTagName(\'*\')[Math.round(Math.random() * document.getElementsByTagName(\'*\').length)];";
-			jsCode += "anotherRandomElement.appendChild(randomElement);";
-			break;
-		case 3:
-			// remove attributes of of subtree of a DOM element
-			jsCode += "if ( randomElement.hasChildNodes() ) {  var children = randomElement.childNodes;  for (var i = 0; i < children.length; i++) {  if (children[i].hasAttributes()) { for (var j= children[i].attributes.length; j-->0;){ children[i].removeAttributeNode(children[i].attributes[j]); } } } }";
-			jsCode += "if ( randomElement.hasAttributes() ) { for (var i= randomElement.attributes.length; i-->0;){ randomElement.removeAttributeNode(randomElement.attributes[i]); }}";
-			break;
-		case 4:
-			// remove text of subtree of a DOM element
-			jsCode += "if ( randomElement.hasChildNodes() ) {  var children = randomElement.childNodes;  for (var i = 0; i < children.length; i++) {  children[i].innerHTML = \'\'; } }";
-			break;
-		}
-		//System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
-		currentMutantIsKilled = false;
-		numOFGeneratedMutant++;
-		return jsCode;
-	}
-
-	// To be used for executing added assertions for the experiments in the paper
-	public static void verifyTrue(String assertionType, boolean assertionCondition) {
-		if (assertionCondition == false){
-			killMutant();
-		}
-
-	}
-	public static void verifyEquals(String assertionType, String s1, String s2) {
-		if (!s1.equals(s2)){
-			killMutant();
-		}	
-	}
-	public static void verifyNotNull(String assertionType, Object o) {
-		if (o == null){
-			killMutant();
-		}	
-	}
-	public static void verifyNull(String assertionType, Object o) {
-		if (o != null){
-			killMutant();
-		}	
-	}
-	public static void killMutant(){
-		if (currentMutantIsKilled == false){
-			currentMutantIsKilled = true;
-			numOFKilledMutant++;
-		}	
-	}
-	public static void reportFailedAssertion(String assertionType){
-		if (assertionType.equals("original"))
-			numOFOrigAssertDetectedMutant++;
-		else if (assertionType.equals("reused"))
-			numOFReusedAssertDetectedMutant++;
-		else if (assertionType.equals("generated"))
-			numOFGeneratedAssertDetectedMutant++;
-	}
-
-
 	@Override
 	public boolean isDomChanged(CrawlerContext context, StateVertex stateBefore, Eventable e, StateVertex stateAfter) {
 		// Detecting which elements are fresh (are in the current DOM state but not in the previous DOM state) 
-		
+		// extract all block elements
 		
 		return defaultDomComparison(stateBefore, stateAfter);
 	}	
