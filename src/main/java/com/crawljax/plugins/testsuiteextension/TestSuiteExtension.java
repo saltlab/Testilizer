@@ -66,6 +66,7 @@ import com.crawljax.core.CrawlTaskConsumer;
 import com.crawljax.core.CrawlerContext;
 import com.crawljax.core.ExitNotifier.ExitStatus;
 import com.crawljax.core.configuration.CrawljaxConfiguration;
+import com.crawljax.core.plugin.DomChangeNotifierPlugin;
 import com.crawljax.core.plugin.ExecuteInitialPathsPlugin;
 import com.crawljax.core.plugin.OnFireEventSucceededPlugin;
 import com.crawljax.core.plugin.OnNewStatePlugin;
@@ -101,7 +102,7 @@ import com.google.common.collect.ImmutableList;
  * It initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.
  **/
 public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
-PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, OnRevisitStatePlugin{
+PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, OnRevisitStatePlugin, DomChangeNotifierPlugin{
 
 	/**
 	 * Setting for my experiments
@@ -474,8 +475,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// inspecting DOM changes and adding to SFG
 							firstConsumer.getCrawler().inspectNewStateForInitailPaths(event);
 
-							// Adding feature vector of all block DOM elements to be later used for prediction when SVM is trained
-							addDOMElementsFeatures(firstConsumer.getContext().getCurrentState());
+							// Adding feature vector of block DOM elements with label -1 to be used for training the SVM.
+							addDOMElementsFeatures(firstConsumer.getContext(), false);
 						}
 
 						else
@@ -552,6 +553,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							System.out.println("XPathExpressionException!");
 							e.printStackTrace();
 						}
+						
+						// Generate feature vector of the asserted element with label +1 and save in the training dataset file to be used for training the SVM
+						addToTrainingSet(getAssertedElemFeatureVector(webElement));
+
 					}
 
 					// to distinguish original assertions from reused/generated ones
@@ -566,8 +571,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(generatePatternAssertion(aep, "OriginalAssertedElemet")); 
 
 					
-					// Generate feature vector of the asserted element with label +1 and save in the training dataset file to be used for training the SVM
-					addToTrainingSet(getAssertedElemFeatureVector(webElement));
 					
 					break;
 				default:
@@ -605,7 +608,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				" 8:" + String.format("%.3f", elemFeatureVector.getLinkDensity()) +
 				" 9:" + String.format("%.3f", elemFeatureVector.getBlockDensity());
 		try {
-			FileWriter fw = new FileWriter("trainingSet.txt", true); //appending new data
+			FileWriter fw = new FileWriter("trainingSet", true); //appending new data
 			fw.write(sample + "\n");
 			fw.close();
 		} catch (IOException e) {
@@ -656,7 +659,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		// extract info from the blocks
 		int classLabel = 1;	// since it is an asserted element
-		int freshness = 0, textImportance = 0; // 0: false
+		int freshness = 1, textImportance = 0; // 1: true, 0: false
 		String blockInnerHTML = assertedElement.getAttribute("innerHTML");
 		double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
 		
@@ -716,64 +719,105 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	private void addDOMElementsFeatures(StateVertex stateVertex) {
-		String[] blockTags = {"/div>", "/span>", "/p>", "/tr>"};
-		String[] tableTags = {"/table>", "/tr>", "/td>"};
+	private void addDOMElementsFeatures(CrawlerContext context, boolean isAlternativeState) {
+
+		//if (true) return;
+
+		StateVertex currentState = context.getCurrentState();
+		StateVertex currentState = context.getCurrentState();
+		
+		int classLabel = -1;	// Default for block elements on manual-test states
+		
+		if (isAlternativeState==true)
+			classLabel = 0;		// These vectors are not going to be used for SVM training, they are stored to be used later for prediction step.
+
+		
+		String[] blockTags = {"/div>", "/span>", "/p>", "/table>"};
+		//String[] listTags = {"/ul>", "/ol>", "/li>"};
+		String[] tableTags = {"/table>", "/tr>"};
 		String[] linkTags = {"/a>"};
 		String[] phraseTags = {"/b>", "/h1>", "/h2>", "/h3>", "/h4>", "/h5>", "/h1>", "/i>", "/em>", "/strong>", "/dfn>", "/code>", "/samp>", "/kbd>", "/var>"};
 		int totalBlocksCount = 0, totalLinksCount = 0, totalTablesCount = 0;
 
-		if (true) return;
-		
 		// extract info from the <body> part
 		WebElement body = browser.getBrowser().findElements(By.tagName("body")).get(0);
 
 		String bodyInnerHTML = body.getAttribute("innerHTML");
-		int bodyWidth = body.getSize().getWidth();
-		int bodyHeight = body.getSize().getHeight();
+		double bodyWidth = (double) body.getSize().getWidth();
+		double bodyHeight = (double) body.getSize().getHeight();
 
 		for (int i=0; i<blockTags.length; i++){
 			Pattern p = Pattern.compile(blockTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
-			while (m.find()){
+			while (m.find())
 				totalBlocksCount +=1;
-			}
-			System.out.println(totalBlocksCount);
+			//System.out.println(totalBlocksCount);
 		}	
 		for (int i=0; i<linkTags.length; i++){
 			Pattern p = Pattern.compile(linkTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
-			while (m.find()){
+			while (m.find())
 				totalLinksCount +=1;
-			}
-			System.out.println(totalLinksCount);
+			//System.out.println(totalLinksCount);
 		}
 		for (int i=0; i<tableTags.length; i++){
 			Pattern p = Pattern.compile(tableTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
-			while (m.find()){
+			while (m.find())
 				totalTablesCount +=1;
-			}
-			System.out.println(totalTablesCount);
+			//System.out.println(totalTablesCount);
 		}
+		
+		
+		
+		
+		int freshness = 0, textImportance = 0; // 1: true, 0: false
+		
+		// TODO: calcule fresshness based on previos state. If was not found in the previous state it is a new element
 
-		// extract info from the block elements
+		// TODO: extract info from the block elements (div, span, p, and table)
+
 		List<WebElement> blockElements = browser.getBrowser().findElements(By.tagName("div"));
 		for (WebElement block: blockElements){
-
-			int classLabel = 0; // This means that these vectors are not going to be used for SVM training, they are stored to be used later for prediction step.
-			int freshness = 0, textImportance = 0; // 0: false
 			String blockInnerHTML = block.getAttribute("innerHTML");
-			double innerHtmlDensity = blockInnerHTML.length() / bodyInnerHTML.length();
-			double linkDensity = blockInnerHTML.length() / totalLinksCount; // WRONG! Double check everything!!!
-			double blockDensity = blockInnerHTML.length() / totalBlocksCount;
-			int blockXPos = block.getLocation().getX();
-			int blockYPos = block.getLocation().getY();
-			double normalBlockWidth = block.getSize().getWidth() / bodyWidth;
-			double normalBlockHeight = block.getSize().getHeight() / bodyHeight;
-			double normalBlockCenterX = (blockXPos + block.getSize().getWidth()/2) / bodyWidth;
-			double normalBlockCenterY = (blockYPos + block.getSize().getHeight()/2) / bodyHeight;	
+			double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
 			
+			double blockXPos = (double) block.getLocation().getX();
+			double blockYPos = (double) block.getLocation().getY();
+			double blockWidth = (double) block.getSize().getWidth();
+			double blockHeight = (double) block.getSize().getHeight();
+			
+			double normalBlockWidth = blockWidth / bodyWidth;
+			double normalBlockHeight = blockHeight / bodyHeight;
+			double normalBlockCenterX = (blockXPos + blockWidth/2) / bodyWidth;
+			double normalBlockCenterY = (blockYPos + blockHeight/2) / bodyHeight;
+
+			int blockBlocksCount = 0, blockLinksCount = 0, blockTablesCount = 0;
+			for (int i=0; i<blockTags.length; i++){
+				Pattern p = Pattern.compile(blockTags[i]);
+				Matcher m = p.matcher(blockInnerHTML);
+				while (m.find())
+					blockBlocksCount +=1;
+			}	
+			for (int i=0; i<linkTags.length; i++){
+				Pattern p = Pattern.compile(linkTags[i]);
+				Matcher m = p.matcher(blockInnerHTML);
+				while (m.find())
+					blockLinksCount +=1;
+			}
+			for (int i=0; i<tableTags.length; i++){
+				Pattern p = Pattern.compile(tableTags[i]);
+				Matcher m = p.matcher(blockInnerHTML);
+				while (m.find())
+					blockTablesCount +=1;
+			}
+			double linkDensity = 0;
+			if (totalLinksCount!=0)
+				linkDensity = (double)blockLinksCount / (double)totalLinksCount;
+			double blockDensity = 0;
+			if (totalBlocksCount!=0)
+				blockDensity = (double)blockBlocksCount / (double)totalBlocksCount;
+
 			for (int i=0; i<phraseTags.length; i++){
 				if (blockInnerHTML.contains(phraseTags[i])){
 					textImportance = 1;
@@ -785,8 +829,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
 
 			System.out.println("features for element " + block + " is: " + elementFeatures);
-			// add the feature vector to the state
-			stateVertex.addElementFeatures(elementFeatures);
+			
+			if (isAlternativeState==false) // should be changed to add to state set first and later dumo in file to remove redundant ones
+				 addToTrainingSet(elementFeatures); 
+			else // add the feature vector to the state
+				currentState.addElementFeatures(elementFeatures);
 		}
 	}
 
@@ -1045,87 +1092,54 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("Training the SVM for assertion prediction...");
 		
 		
-		// SVM training
-		String arguments[] = {"trainingSet.txt"};
+		// SVM training, generates trainingSet.model file
+		String arguments[] = {"trainingSet"};
 		svm_train t = new svm_train();
-		t.run(arguments);
+		try {
+			t.run(arguments);
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
 
-		
-		// SVM predicting
-		String argv[] = {"heart_scale", "heart_scale.model", "output"};
-		int i=0, predict_probability=0;
-		try 
-		{
-			BufferedReader input = new BufferedReader(new FileReader(argv[i]));
-			DataOutputStream output = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(argv[i+2])));
-			svm_model model = svm.svm_load_model(argv[i+1]);
 
-			// predict(input,output,model,predict_probability);
+		// SVM predicting for a feature vector
+		/*String modelFile = "trainingSet.model";
+		svm_model model;
+		try {
+			model = svm.svm_load_model(modelFile);
 
-			int correct = 0;
-			int total = 0;
-			double error = 0;
-			double sumv = 0, sumy = 0, sumvv = 0, sumyy = 0, sumvy = 0;
+			StateVertex state = null;
+			for (ElementFeatures ef: state.getElementFeatures()){
 
-			int svm_type=svm.svm_get_svm_type(model);
-			int nr_class=svm.svm_get_nr_class(model);
-			double[] prob_estimates=null;
-
-			while(true)
-			{
-				String line = input.readLine();
-				if(line == null) break;
-
-				StringTokenizer st = new StringTokenizer(line," \t\n\r\f:");
-
-				double target = Double.valueOf(st.nextToken()).doubleValue();
-				int m = st.countTokens()/2;
-				svm_node[] x = new svm_node[m];
-				for(int j=0;j<m;j++)
-				{
+				svm_node[] x = new svm_node[9];
+				for(int j=0;j<9;j++){
 					x[j] = new svm_node();
-					x[j].index = Integer.parseInt(st.nextToken());
-					x[j].value = Double.valueOf(st.nextToken()).doubleValue();
+					x[j].index = j+1;
 				}
 
-				double v;
-				v = svm.svm_predict(model,x);
-				output.writeBytes(v+"\n");
+				x[0].value = ef.getFreshness();
+				x[1].value = ef.getTextImportance();
+				x[2].value = ef.getNormalBlockWidth();
+				x[3].value = ef.getNormalBlockHeight();
+				x[4].value = ef.getNormalBlockCenterX();
+				x[5].value = ef.getNormalBlockCenterY();
+				x[6].value = ef.getInnerHtmlDensity();
+				x[7].value = ef.getLinkDensity();
+				x[8].value = ef.getBlockDensity();
 
-				if(v == target)
-					++correct;
-				error += (v-target)*(v-target);
-				sumv += v;
-				sumy += target;
-				sumvv += v*v;
-				sumyy += target*target;
-				sumvy += v*target;
-				++total;
+				int prediction = (int) svm.svm_predict(model,x);
+
 			}
-			
-			svm_predict.info("Accuracy = "+(double)correct/total*100+"% ("+correct+"/"+total+") (classification)\n");
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}*/
 
 
 
 
-			input.close();
-			output.close();
-		} 
-		catch(FileNotFoundException e) 
-		{
-		}
-		catch(ArrayIndexOutOfBoundsException e) 
-		{
-		}
 
-		
-		
-		
-		
-		
-		
-		
-		
+
+
 		// DOM-based assertion generation part
 		for (StateVertex s: sfg.getAllStates()){
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
@@ -1601,14 +1615,16 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	/**
-	 * Checking assertions on happy paths from existing test suite on new paths
-	 * Currently dealing with assertions that are DOM related. We do not consider 
-	 * those using variables in test cases for simplicity at this step.
-	 */
+
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 
+		// Adding feature vector of block DOM elements with label 0 to be predicted by the trained SVM.
+		addDOMElementsFeatures(context, true);
+		
+		
+		
+		
 		if (true)
 			return;
 
@@ -1798,6 +1814,27 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			numOFReusedAssertDetectedMutant++;
 		else if (assertionType.equals("generated"))
 			numOFGeneratedAssertDetectedMutant++;
+	}
+
+
+	@Override
+	public boolean isDomChanged(CrawlerContext context, StateVertex stateBefore, Eventable e, StateVertex stateAfter) {
+		// Detecting which elements are fresh (are in the current DOM state but not in the previous DOM state) 
+		
+		
+		return defaultDomComparison(stateBefore, stateAfter);
 	}	
 
+	private boolean defaultDomComparison(StateVertex stateBefore, StateVertex stateAfter) {
+		// default DOM comparison behavior
+		boolean isChanged = !stateAfter.equals(stateBefore);
+		if (isChanged) {
+			LOG.debug("Dom is Changed!");
+			return true;
+		} else {
+			LOG.debug("Dom not Changed!");
+			return false;
+		}
+	}
+	
 }
