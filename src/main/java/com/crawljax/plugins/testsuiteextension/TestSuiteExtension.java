@@ -21,6 +21,8 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
@@ -108,21 +110,20 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	/**
 	 * Setting for my experiments
 	 */
-	String appName = "claroline";
-	//String appName = "photogallery";
-	static boolean addAssertionsToExtendedSuite = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	//String appName = "claroline";
+	String appName = "photogallery";
+
+	static boolean loadSFGFromFile = true;
+	
+	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addLearnedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
-	// for mutation-testing both should be true
-	static boolean mutateDOM = false;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
-
-	static boolean ignoreAndReportAssertionFailure = true;  // on DOM-based mutation testing to evaluate effectiveness (default should be false)
-
 	// SVM training set
-	HashSet<ElementFeatures> trainingSetElementFeatures = new HashSet<ElementFeatures>();
-	HashSet<ElementFeatures> freshBlockElementFeatures = new HashSet<ElementFeatures>(); // block elements in the current state which were not in the previous state
-
+	ArrayList<ElementFeatures> trainingSetElementFeatures = new ArrayList<ElementFeatures>();
+	boolean manualTestPathsCreated = false;
 
 
 
@@ -210,7 +211,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}
 		});
 
-		
+
 		/*
 		LOG.info(System.getProperty("java.home"));
 		//Not set on my Mac
@@ -237,7 +238,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		*/
+		 */
 
 		// Not set on my Mac
 		boolean success = true;
@@ -293,8 +294,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	@Override
 	public void initialPathExecution(CrawljaxConfiguration conf, CrawlTaskConsumer firstConsumer) {
-		//if (true)
-		//	return;
+		if (loadSFGFromFile)
+			return;
 
 		int numOfTestCases = 0;
 
@@ -410,14 +411,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				case "sendKeys":
 					// storing input values for an element to be clicked later
 					String inputValue = methodValue.get(1);
-
 					// dealing with random input data
 					if (inputValue.equals("$RandValue")){
 						inputValue = "RND-" + new RandomInputValueGenerator().getRandomString(4);
 						System.out.println("Random string " + inputValue + " generated for inputValue");
 					}
-
-
 					// setting form input values for the Eventable
 					//System.out.println("adding " + inputValue + " to inputs");
 					relatedFormInputs.add(new FormInput(webElement.getTagName() , new Identification(how, howValue), inputValue));
@@ -432,7 +430,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						event = getCorrespondingEventable(webElement, new Identification(how, howValue), EventType.click, browser);
 						System.out.println("event: " + event);
 
-
 						//System.out.println("setting form inputs with: " + relatedFormInputs);
 						CopyOnWriteArrayList<FormInput> relatedFormInputsCopy = new CopyOnWriteArrayList<FormInput>();
 						relatedFormInputsCopy.addAll(relatedFormInputs);
@@ -441,7 +438,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						event.setRelatedFormInputs(relatedFormInputsCopy);
 
 						CopyOnWriteArrayList<FormInput> formInputsToCheck = event.getRelatedFormInputs();
-
 						//System.out.println("formInputsToCheck: " + formInputsToCheck);							
 
 						firstConsumer.getCrawler().handleInputElements(event);
@@ -454,11 +450,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// inspecting DOM changes and adding to SFG
 							firstConsumer.getCrawler().inspectNewStateForInitailPaths(event);
 
-							// Adding feature vector of block DOM elements with label -1 to be used for training the SVM.
-							ArrayList<ElementFeatures> DOMElementsFeatures = getDOMElementsFeatures(false);
-							for (ElementFeatures ef: DOMElementsFeatures)
-								trainingSetElementFeatures.add(ef);
-							
 						}
 
 						else
@@ -535,25 +526,30 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							System.out.println("XPathExpressionException!");
 							e.printStackTrace();
 						}
-						
+
+
 						// Generate feature vector of the asserted element with label +1 to be used for training the SVM
-						trainingSetElementFeatures.add(getAssertedElemFeatureVector(webElement));
+
+						// old version
+						// trainingSetElementFeatures.add(getAssertedElemFeatureVector(webElement));
+
+						// new version
+						addToTrainingSet(getAssertedElemFeatureVector(webElement));
 
 					}
 
 					// to distinguish original assertions from reused/generated ones
 					AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, elementLocator);
 					aep.setAssertionOrigin("original assertion");
-					//if (!originalAssertedElementPatterns.contains(aep))
-					originalAssertedElementPatterns.add(aep);
 					// adding assertion to the current DOM state in the SFG
-					boolean assertionAdded = firstConsumer.getContext().getCurrentState().addAssertedElementPattern(aep);
+					StateVertex currentState = firstConsumer.getContext().getCurrentState();
+					boolean assertionAdded = currentState.addAssertedElementPattern(aep);
 					// adding an AssertedElemetPattern-level assertion for the original assertion
 					if (assertionAdded)
-						firstConsumer.getContext().getCurrentState().addAssertedElementPattern(generatePatternAssertion(aep, "OriginalAssertedElemet")); 
+						currentState.addAssertedElementPattern(generatePatternAssertion(aep, "AEP for Original")); 
 
-					
-					
+
+
 					break;
 				default:
 				}
@@ -569,12 +565,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		finalReport += "#states in the SFG after generating happy paths: " + Integer.toString(firstConsumer.getContext().getSession().getStateFlowGraph().getNumberOfStates()) + "\n";
 		finalReport += "#transitions in the SFG after generating happy paths: " + Integer.toString(firstConsumer.getContext().getSession().getStateFlowGraph().getAllEdges().size()) + "\n";
 
-		CrawlSession session = firstConsumer.getContext().getSession();
+		manualTestPathsCreated = true;
 
-		//saveSFG(session);
+		CrawlSession session = firstConsumer.getContext().getSession();
+		saveSFG(session);
 
 	}
-	
+
 	private void addToTrainingSet(ElementFeatures elemFeatureVector) {
 		// Dumping the feature vectore of asserted element into training dataset
 		// sample data format: <label> <featureIndex>:<featureValue>. E.g: +1 1:0.708333 2:1 3:1 4:-0.320755 5:-0.105023 ...
@@ -597,12 +594,16 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			e.printStackTrace();
 			System.err.println("IOException: " + e.getMessage());
 		}
-		
-		
+
+
 	}
 
 
 	private ElementFeatures getAssertedElemFeatureVector(WebElement assertedElement) {
+
+		String xpath = getXPath(assertedElement);
+
+
 		String[] blockTags = {"/div>", "/span>", "/p>", "/table>"};
 		//String[] listTags = {"/ul>", "/ol>", "/li>"};
 		String[] tableTags = {"/table>", "/tr>"};
@@ -621,22 +622,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			Pattern p = Pattern.compile(blockTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
 			while (m.find())
-				totalBlocksCount +=1;
-			//System.out.println(totalBlocksCount);
+				totalBlocksCount++;
 		}	
 		for (int i=0; i<linkTags.length; i++){
 			Pattern p = Pattern.compile(linkTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
 			while (m.find())
-				totalLinksCount +=1;
-			//System.out.println(totalLinksCount);
+				totalLinksCount++;
 		}
 		for (int i=0; i<tableTags.length; i++){
 			Pattern p = Pattern.compile(tableTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
 			while (m.find())
-				totalTablesCount +=1;
-			//System.out.println(totalTablesCount);
+				totalTablesCount++;
 		}
 
 		// extract info from the blocks
@@ -644,12 +642,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		int freshness = 1, textImportance = 0; // 1: true, 0: false
 		String blockInnerHTML = assertedElement.getAttribute("innerHTML");
 		double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
-		
+
 		double blockXPos = (double) assertedElement.getLocation().getX();
 		double blockYPos = (double) assertedElement.getLocation().getY();
 		double blockWidth = (double) assertedElement.getSize().getWidth();
 		double blockHeight = (double) assertedElement.getSize().getHeight();
-		
+
 		double normalBlockWidth = blockWidth / bodyWidth;
 		double normalBlockHeight = blockHeight / bodyHeight;
 		double normalBlockCenterX = (blockXPos + blockWidth/2) / bodyWidth;
@@ -660,21 +658,21 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			Pattern p = Pattern.compile(blockTags[i]);
 			Matcher m = p.matcher(blockInnerHTML);
 			while (m.find())
-				blockBlocksCount +=1;
+				blockBlocksCount++;
 			//System.out.println(blockBlocksCount);
 		}	
 		for (int i=0; i<linkTags.length; i++){
 			Pattern p = Pattern.compile(linkTags[i]);
 			Matcher m = p.matcher(blockInnerHTML);
 			while (m.find())
-				blockLinksCount +=1;
+				blockLinksCount++;
 			//System.out.println(blockLinksCount);
 		}
 		for (int i=0; i<tableTags.length; i++){
 			Pattern p = Pattern.compile(tableTags[i]);
 			Matcher m = p.matcher(blockInnerHTML);
 			while (m.find())
-				blockTablesCount +=1;
+				blockTablesCount++;
 			//System.out.println(blockTablesCount);
 		}
 		double linkDensity = 0;
@@ -692,8 +690,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}
 		}
 
-		
-		ElementFeatures elementFeatures = new ElementFeatures(freshness, textImportance, normalBlockWidth, normalBlockHeight, 
+
+		ElementFeatures elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
 				normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
 
 		System.out.println("features for element " + assertedElement + " is: " + elementFeatures);
@@ -701,17 +699,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	private ArrayList<ElementFeatures> getDOMElementsFeatures(boolean isAlternativeState) {
+	private ArrayList<ElementFeatures> getDOMElementsFeatures() {
 
-		//if (true) return;
-		
 		ArrayList<ElementFeatures> DOMElementsFeatures = new ArrayList<ElementFeatures>();
 
 		int classLabel = -1;	// Default for block elements on manual-test states
-		
-		if (isAlternativeState==true)
+
+		if (manualTestPathsCreated==true)
 			classLabel = 0;		// These vectors are not going to be used for SVM training, they are stored to be used later for prediction step.
-		
+
 		String[] blockTags = {"/div>", "/span>", "/p>", "/table>"};
 		//String[] listTags = {"/ul>", "/ol>", "/li>"};
 		String[] tableTags = {"/table>", "/tr>"};
@@ -730,26 +726,23 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			Pattern p = Pattern.compile(blockTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
 			while (m.find())
-				totalBlocksCount +=1;
-			//System.out.println(totalBlocksCount);
+				totalBlocksCount++;
 		}	
 		for (int i=0; i<linkTags.length; i++){
 			Pattern p = Pattern.compile(linkTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
 			while (m.find())
-				totalLinksCount +=1;
-			//System.out.println(totalLinksCount);
+				totalLinksCount++;
 		}
 		for (int i=0; i<tableTags.length; i++){
 			Pattern p = Pattern.compile(tableTags[i]);
 			Matcher m = p.matcher(bodyInnerHTML);
 			while (m.find())
-				totalTablesCount +=1;
-			//System.out.println(totalTablesCount);
+				totalTablesCount++;
 		}
-		
-		
-		
+
+
+
 		// TODO: extract info from the block elements (div, span, p, and table)
 
 		// fresshness will be calculated based on previous state. If was not found in the previous state it is a new element
@@ -757,14 +750,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		List<WebElement> blockElements = browser.getBrowser().findElements(By.tagName("div"));
 		for (WebElement block: blockElements){
+
+			String xpath = getXPath(block);
+
 			String blockInnerHTML = block.getAttribute("innerHTML");
 			double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
-			
+
 			double blockXPos = (double) block.getLocation().getX();
 			double blockYPos = (double) block.getLocation().getY();
 			double blockWidth = (double) block.getSize().getWidth();
 			double blockHeight = (double) block.getSize().getHeight();
-			
+
 			double normalBlockWidth = blockWidth / bodyWidth;
 			double normalBlockHeight = blockHeight / bodyHeight;
 			double normalBlockCenterX = (blockXPos + blockWidth/2) / bodyWidth;
@@ -775,19 +771,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				Pattern p = Pattern.compile(blockTags[i]);
 				Matcher m = p.matcher(blockInnerHTML);
 				while (m.find())
-					blockBlocksCount +=1;
+					blockBlocksCount++;
 			}	
 			for (int i=0; i<linkTags.length; i++){
 				Pattern p = Pattern.compile(linkTags[i]);
 				Matcher m = p.matcher(blockInnerHTML);
 				while (m.find())
-					blockLinksCount +=1;
+					blockLinksCount++;
 			}
 			for (int i=0; i<tableTags.length; i++){
 				Pattern p = Pattern.compile(tableTags[i]);
 				Matcher m = p.matcher(blockInnerHTML);
 				while (m.find())
-					blockTablesCount +=1;
+					blockTablesCount++;
 			}
 			double linkDensity = 0;
 			if (totalLinksCount!=0)
@@ -802,29 +798,27 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					break;
 				}
 			}
-			
-			ElementFeatures elementFeatures = new ElementFeatures(freshness, textImportance, normalBlockWidth, normalBlockHeight, 
+
+			ElementFeatures elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
 					normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
 
-			System.out.println("features for element " + block + " is: " + elementFeatures);
-			
+			//System.out.println("features for element " + block + " is: " + elementFeatures);
+
 			DOMElementsFeatures.add(elementFeatures);
-			
+
 		}
 		return DOMElementsFeatures;
 	}
 
-	
-	
+
+
 	private void saveSFG(CrawlSession session) {
-		LOG.info("Saving the SFG based on executed Selenium test cases...");
+		LOG.info("Saving the SFG...");
 		StateFlowGraph sfg = session.getStateFlowGraph();
-
 		FileOutputStream fos = null;
-
 		ObjectOutputStream out = null;
-		// Save the SFG to file
 		String sfgFileName = "sfg.ser";
+		// Save the SFG to file
 		try {
 			fos = new FileOutputStream(sfgFileName);
 			out = new ObjectOutputStream(fos);
@@ -834,25 +828,30 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
+	}
 
+
+	private StateFlowGraph loadSFG() {
+		LOG.info("Loading the SFG...");
+		FileInputStream fis = null;
+		ObjectInputStream in = null;
+		String sfgFileName = "sfg.ser";
 		// Read the SFG from file for testing
-		/*StateFlowGraph sfg2 = null;
+		StateFlowGraph sfg = null;
 		try {
 			fis = new FileInputStream(sfgFileName);
 			in = new ObjectInputStream(fis);
-			sfg2 = (StateFlowGraph) in.readObject();
+			sfg = (StateFlowGraph) in.readObject();
 			in.close();
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
 
-		sfg2 = null;
-
 		//LOG.info(Serializer.toPrettyJson(sfg));
+		//if (Serializer.toPrettyJson(sfg).equals(Serializer.toPrettyJson(sfg2)))
+		//	LOG.info("ERROR!");
 
-		if (Serializer.toPrettyJson(sfg).equals(Serializer.toPrettyJson(sfg2)))
-			LOG.info("ERROR!");
-		 */
+		return sfg;
 
 	}
 
@@ -1059,65 +1058,42 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
 		System.out.println("List of asserted element paterns in assertedElementPatterns:");
+
+		StateFlowGraph sfg;
+		if (loadSFGFromFile)
+			sfg = loadSFG();
+		else
+			sfg = session.getStateFlowGraph();
+		
+
+		for (StateVertex s: sfg.getAllStates()){
+			for (AssertedElementPattern	aep: s.getAssertedElementPatters())
+				if (aep.getAssertionOrigin().equals("original assertion"))
+					originalAssertedElementPatterns.add(aep);
+		}		
+
 		for (AssertedElementPattern	aep: originalAssertedElementPatterns)
 			System.out.println(aep.getAssertion());
 
 		System.out.println("***************");
 
-		StateFlowGraph sfg = session.getStateFlowGraph();
 
-		System.out.println("Training the SVM for assertion prediction...");
-		// writing from the HashSet to training set file
-		for (ElementFeatures ef: trainingSetElementFeatures)
-			addToTrainingSet(ef);
-		
-		// SVM training, generates trainingSet.model file
-		String arguments[] = {"trainingSet"};
-		svm_train t = new svm_train();
-		try {
-			t.run(arguments);
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+		if (!loadSFGFromFile){
+			System.out.println("Training the SVM for assertion prediction...");
 
-
-		// SVM predicting for a feature vector
-		/*String modelFile = "trainingSet.model";
-		svm_model model;
-		try {
-			model = svm.svm_load_model(modelFile);
-
-			StateVertex state = null;
-			for (ElementFeatures ef: state.getElementFeatures()){
-
-				svm_node[] x = new svm_node[9];
-				for(int j=0;j<9;j++){
-					x[j] = new svm_node();
-					x[j].index = j+1;
-				}
-
-				x[0].value = ef.getFreshness();
-				x[1].value = ef.getTextImportance();
-				x[2].value = ef.getNormalBlockWidth();
-				x[3].value = ef.getNormalBlockHeight();
-				x[4].value = ef.getNormalBlockCenterX();
-				x[5].value = ef.getNormalBlockCenterY();
-				x[6].value = ef.getInnerHtmlDensity();
-				x[7].value = ef.getLinkDensity();
-				x[8].value = ef.getBlockDensity();
-
-				int prediction = (int) svm.svm_predict(model,x);
-
+			// choosing top-k frequent features from the ArrayList to be written in the training set file
+			Collections.sort(trainingSetElementFeatures,new ElementFeatureComp());
+			int topK = 50;
+			for (ElementFeatures ef: trainingSetElementFeatures){
+				System.out.println(ef);
+				addToTrainingSet(ef);
+				if (topK-- == 0)
+					break;
 			}
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}*/
 
-
-
-
-
-
+			// SVM training, generates trainingSet.model file
+			svmTrain();
+		}
 
 		// DOM-based assertion generation part
 		for (StateVertex s: sfg.getAllStates()){
@@ -1127,6 +1103,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			//	for (int i=0;i<s.getAssertions().size();i++)
 			//		System.out.println(s.getAssertions().get(i));
 			//}
+
 
 			for (AssertedElementPattern	aep: originalAssertedElementPatterns){
 				//System.out.println("aep: " +  aep);
@@ -1161,7 +1138,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								//System.out.println("ElementTagAttMatch");
 								s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
 								break;
-							//case "ElementTagMatch":
+								//case "ElementTagMatch":
 								//System.out.println(aep);
 								//System.out.println("ElementTagMatch");
 								//s.addAssertedElementPattern(generateElementAssertion(aep, howElementMatched));
@@ -1214,17 +1191,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					if (i!=j){
 						if (AEP.get(i).getSourceElement()==AEP.get(j).getSourceElement());
 						while (AEP.get(i).getSourceElement().getParentNode().getNodeName().toUpperCase()!="BODY")
-						
-						
+
+
 						tempElement = tempElement.getParentNode();
 					}
 				}
-			*/
+			 */
 
 
 		}
 
-		generateTestSuite(session);
+		generateTestSuite(sfg);
 
 		LOG.info("#states in the final SFG: " + sfg.getNumberOfStates());	
 		LOG.info("#transitions in the final SFG: " + sfg.getAllEdges().size());	
@@ -1233,6 +1210,55 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("TestSuiteExtension plugin has finished");
 	}
 
+	// Training the SVM
+	private void svmTrain() {
+		String arguments[] = {"trainingSet"};
+		svm_train t = new svm_train();
+		try {
+			t.run(arguments);
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+	}
+
+	// SVM predicting for a feature vector
+	private ArrayList<String> svmPredict(StateVertex state) {
+		ArrayList<String> xpathList = new ArrayList<String>();
+
+		svm_model model;
+		try {
+			model = svm.svm_load_model("trainingSet.model");
+			for (ElementFeatures ef: state.getElementFeatures()){
+
+				svm_node[] x = new svm_node[9];
+				for(int j=0;j<9;j++){
+					x[j] = new svm_node();
+					x[j].index = j+1;
+				}
+
+				x[0].value = ef.getFreshness();
+				x[1].value = ef.getTextImportance();
+				x[2].value = ef.getNormalBlockWidth();
+				x[3].value = ef.getNormalBlockHeight();
+				x[4].value = ef.getNormalBlockCenterX();
+				x[5].value = ef.getNormalBlockCenterY();
+				x[6].value = ef.getInnerHtmlDensity();
+				x[7].value = ef.getLinkDensity();
+				x[8].value = ef.getBlockDensity();
+
+				int prediction = (int) svm.svm_predict(model,x);
+				if (prediction == 1)
+					xpathList.add(ef.getXpath());
+			}
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		
+		return xpathList;
+	}
+
+	
+	
 	private AssertedElementPattern generatePatternAssertion(AssertedElementPattern aep, String howMatched) {
 		// pattern assertion on BODY is useless
 		if (aep.getTagName().toUpperCase().equals("BODY"))
@@ -1330,15 +1356,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 * Generating the extended test suite in multiple files
 	 * @param session
 	 */
-	private void generateTestSuite(CrawlSession session) {
-		StateFlowGraph sfg = session.getStateFlowGraph();
+	private void generateTestSuite(StateFlowGraph sfg) {
 
 		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
 		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
 		String how, howValue, sendValue;
 
-		int counter = 0, totalAssertions = 0, actionableAssertions = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
-				ElementFullMatch = 0, ElementTagAttMatch = 0, ElementTagMatch = 0, PatternFullMatch = 0, PatternTagAttMatch = 0, PatternTagMatch = 0, OriginalAssertedElemetAssertions=0;
+		int counter = 0, totalAssertions = 0, predictedAssertions = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
+				ElementFullMatch = 0, ElementTagAttMatch = 0, PatternFullMatch = 0, PatternTagAttMatch = 0, PatternTagMatch = 0, AEPforOriginalAssertions=0;
 
 		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
 			//For each new sink node
@@ -1357,11 +1382,20 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
 					//System.out.println("//" + edge.toString());
 
-					// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
-					testMethod.addStatement("mutateDOMTree();");
 
-					// adding assertions
+					// Adding assertions
 					if (edge.getSourceStateVertex().getAssertions().size()>0){
+
+						// Adding learned assertions (SVM predicting for a feature vector)
+						if (addLearnedAssertions){
+							ArrayList<String> xpathList = svmPredict(edge.getSourceStateVertex());
+							for (String xpath: xpathList){
+								testMethod.addStatement("assertTrue(isElementPresent(By.xpath(\"" + xpath +"\"))); // predicted assertion");
+								predictedAssertions++;
+								totalAssertions++;
+							}
+						}
+
 						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementPatters().size();i++){
 							String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
 							String assertionOringin = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
@@ -1370,55 +1404,41 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							if (edge.getSourceStateVertex().getId()==0 && assertion.equals("assertTrue(isElementPresent(By.linkText(\"Logout\")))"))
 								continue;
 
-							// Wrapping the original assert statements
-							/*String type = null;
-							if (assertionOringin.contains("original assertion"))
-								type = "original";
-							else if (assertionOringin.contains("reused assertion"))
-								type = "reused";
-							else if (assertionOringin.contains("generated assertion"))
-								type = "generated";
-							String toRelace = "verifyTrue(\"".concat(type).concat("\", ");
-							assertion = assertion.replace("assertTrue(", toRelace);
-							toRelace = "verifyEquals(\"".concat(type).concat("\", ");
-							assertion.replace("assertEquals(", toRelace);
-							toRelace = "verifyNotNull(\"".concat(type).concat("\", ");
-							assertion.replace("assertNotNull(", toRelace);
-							toRelace = "verifyNull(\"".concat(type).concat("\", ");
-							assertion.replace("assertNull(", toRelace);
-							 */
-
-							totalAssertions++;
+							// Adding original assertion to the method
 							if (assertionOringin.contains("original assertion")){
-								// Adding assertion to the method
 								testMethod.addStatement(assertion + "; // " + assertionOringin);
 								origAndReusedAssertions++;
-							}else if (shouldRunAssertionInExtendedSuite()){
-								// Adding assertion to the method
-								testMethod.addStatement("if (shouldRunAssertion()){");
-								testMethod.addStatement(assertion + "; // " + assertionOringin);
-								testMethod.addStatement("}");
+								totalAssertions++;
+							}
+							
+							// Adding reused assertion to the method
+							if (addReusedAssertions){
 								if (assertionOringin.contains("reused assertion")){
+								testMethod.addStatement(assertion + "; // " + assertionOringin);
 									reusedAssertions++;
-									if (assertionOringin.contains("ElementFullMatch")){
-										ElementFullMatch++;	
-									}
-								}else{
+									ElementFullMatch++;
+									totalAssertions++;
+								}
+							}
+
+							// Adding generated assertion to the method
+							if (addGeneratedAssertions){
+								if (assertionOringin.contains("generated assertion")){
+									testMethod.addStatement(assertion + "; // " + assertionOringin);
 									generatedAssertions++;
-									if (assertionOringin.contains("actionable"))
-										actionableAssertions++;
+									totalAssertions++;
 									if (assertionOringin.contains("ElementTagAttMatch"))
 										ElementTagAttMatch++;
-									if (assertionOringin.contains("ElementTagMatch"))
-										ElementTagMatch++;
+									//if (assertionOringin.contains("ElementTagMatch"))
+									//	ElementTagMatch++;
 									if (assertionOringin.contains("PatternFullMatch"))
 										PatternFullMatch++;
 									if (assertionOringin.contains("PatternTagAttMatch"))
 										PatternTagAttMatch++;
 									if (assertionOringin.contains("PatternTagMatch"))
 										PatternTagMatch++;
-									if (assertionOringin.contains("OriginalAssertedElemet"))
-										OriginalAssertedElemetAssertions++;									
+									if (assertionOringin.contains("AEP for Original"))
+										AEPforOriginalAssertions++;									
 								}
 							}
 
@@ -1495,7 +1515,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					String fileName = null;
 
 					JavaTestGenerator generator =
-							new JavaTestGenerator(CLASS_NAME, session.getInitialState().getUrl(), testMethods);
+							new JavaTestGenerator(CLASS_NAME, sfg.getInitialState().getUrl(), testMethods);
 
 					fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
 
@@ -1518,9 +1538,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		System.out.println("Total #sink nodes:" + results.size());
 
-		
-		
-		
+
+
+
 		System.out.println("Total #assertions in the original test suite:" + originalAssertedElementPatterns.size());
 
 		System.out.println("Total #assertions in the test suite from happy paths (origAndReusedAssertions): " + origAndReusedAssertions);
@@ -1538,13 +1558,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		System.out.println("Total #ElementFullMatch: " + ElementFullMatch);
 		System.out.println("Total #ElementTagAttMatch: " + ElementTagAttMatch);
-		System.out.println("Total #ElementTagMatch: " + ElementTagMatch);
+		//System.out.println("Total #ElementTagMatch: " + ElementTagMatch);
 		System.out.println("Total #PatternFullMatch: " + PatternFullMatch);
 		System.out.println("Total #PatternTagAttMatch: " + PatternTagAttMatch);
 		System.out.println("Total #PatternTagMatch: " + PatternTagMatch);
-		System.out.println("Total #actionableAssertions: " + actionableAssertions);
-		System.out.println("Total #OriginalAssertedElemetAssertions: " + OriginalAssertedElemetAssertions);
-	
+		System.out.println("Total #predictedAssertions: " + predictedAssertions);
+		System.out.println("Total #AEPforOriginalAssertions: " + AEPforOriginalAssertions);
+
 	}
 
 
@@ -1584,24 +1604,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
 	}
 
-
-
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 
-		// Getting feature vector of block DOM elements with label 0 to be predicted by the trained SVM.
-		ArrayList<ElementFeatures> DOMElementsFeatures = getDOMElementsFeatures(true);
-		// Adding feature vectors to the state
-		for (ElementFeatures ef: DOMElementsFeatures) 
-			vertex.addElementFeatures(ef);
-
-		
-		
 		if (true)
 			return;
 
 		// bypass or select random if error occured or coverage impact is negative
-		
+
 		// Calculate initial code coverage for the index page to be used by Feedex
 		if (vertex.getId() == vertex.INDEX_ID){
 			for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
@@ -1621,7 +1631,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	}
 
-
 	// Keeping track of executed lines of a js which will be used to calcualte coverage	
 	public void setCountList(String modifiedJS, Object counter){
 		ArrayList<Integer> countList = new ArrayList<Integer>();
@@ -1640,7 +1649,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			JSCountList.put(modifiedJS, countList);
 		}
 	}
-
 
 	// Compute code coverage
 	public double getCoverage(){
@@ -1672,54 +1680,58 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
+	@Override
+	public boolean isDomChanged(CrawlerContext context, StateVertex stateBefore, Eventable e, StateVertex stateAfter) {
+		// Detecting which elements are fresh (are in the current DOM state but not in the previous DOM state) 
+		// extract all block elements, generate features vectors, determine new ones, add those with freshnes = 1 to set of freshElement
 
-	/*
-	 * The following methods are helpers for the generated JUnit files
-	 */
+		ArrayList<ElementFeatures> oldElementsFeatures = stateBefore.getElementFeatures();
+		// Getting feature vector of block DOM elements [label=-1 (if manualTestPath is not creatred) and 0 otherwise], to be predicted by the trained SVM.
+		ArrayList<ElementFeatures> newElementsFeatures = getDOMElementsFeatures();
+		// Adding feature vectors to the state
+		for (ElementFeatures ef: newElementsFeatures){
+			if (!oldElementsFeatures.contains(ef)) // the classLable and freshness does not play role in comparison
+				ef.setFreshness(1);  // Setting freshness to 1 if element is a new element on page. Default is 0.
+			stateAfter.addElementFeatures(ef);
 
-	// To be used for executing added assertions for the experiments in the paper
-	public static boolean shouldRunAssertionInExtendedSuite() {
-		return addAssertionsToExtendedSuite;
+			// Adding feature vector of block DOM elements with label -1 (from manual test states) to be used for training the SVM.
+			boolean elementExist = false;
+			if (manualTestPathsCreated==false){
+				for (ElementFeatures currentEF : trainingSetElementFeatures){
+					if (currentEF.equals(ef)){
+						currentEF.increaseCount();
+						if (ef.getCount()==0)  // Change fresh to non-fresh
+							currentEF.setFreshness(0);
+						elementExist = true;
+						break;
+					}
+					if (currentEF.cosineSimilarity(ef)<0.3){
+						elementExist = true;
+						break;
+					}					
+				}
+				if (elementExist == false)
+					trainingSetElementFeatures.add(ef);
+			}
+		}
+
+		// default DOM comparison behavior
+		return !stateAfter.equals(stateBefore);
+	}	
+
+	class ElementFeatureComp implements Comparator<ElementFeatures>{
+		@Override
+		public int compare(ElementFeatures ef1, ElementFeatures ef2) {
+			return (ef2.getCount() - ef1.getCount());
+		}
 	}
 
-	// To be used for calculating JS code coverage for the experiments in the paper
+
+	/*
+	 * The helpers method for the generated JUnit files for calculating JS code coverage for the experiments in the paper
+	 */
 	public static boolean getCoverageReport() {
 		return getCoverageReport;
 	}
 
-	// To be used for executing added assertions for the experiments in the paper
-	public static boolean shouldIgnoreAssertionFailure() {
-		return ignoreAndReportAssertionFailure;
-	}
-
-	@Override
-	public boolean isDomChanged(CrawlerContext context, StateVertex stateBefore, Eventable e, StateVertex stateAfter) {
-		// Detecting which elements are fresh (are in the current DOM state but not in the previous DOM state) 
-		// extract all block elements, generate featurte vectors, determine new ones, add those with freshnes = 1 to set of freshElement
-		
-		ArrayList<ElementFeatures> oldElementsFeatures = stateBefore.getElementFeatures();
-		// since adding features to stateAfter will be done on OnNewState plugin which is after DOMChangeNotifier, we need to get features from browser at this step.
-		ArrayList<ElementFeatures> newElementsFeatures = getDOMElementsFeatures(true);
-		// Adding feature vectors to the state
-		for (ElementFeatures ef: newElementsFeatures)
-			if (oldElementsFeatures)
-			freshBlockElementFeatures.add(ef);
-		
-		
-		
-		return defaultDomComparison(stateBefore, stateAfter);
-	}	
-
-	private boolean defaultDomComparison(StateVertex stateBefore, StateVertex stateAfter) {
-		// default DOM comparison behavior
-		boolean isChanged = !stateAfter.equals(stateBefore);
-		if (isChanged) {
-			LOG.debug("Dom is Changed!");
-			return true;
-		} else {
-			LOG.debug("Dom not Changed!");
-			return false;
-		}
-	}
-	
 }
