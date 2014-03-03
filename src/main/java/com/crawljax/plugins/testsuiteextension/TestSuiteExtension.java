@@ -108,18 +108,24 @@ public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, 
 PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomChangeNotifierPlugin{
 
 	/**
-	 * Setting for my experiments
+	 * Settings for my experiments
 	 */
 	//String appName = "claroline";
 	String appName = "photogallery";
 
 	static boolean loadSFGFromFile = true;
-	
+
 	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addLearnedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
+
+	// DOM-mutation testing settings
+	static boolean mutateDOM = false;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
+	public static int MutationOperatorCode = 1; // DOM mutation operator is set via test suite runner
+	public static int StateToBeMutated = 0; // This is also set via test suite runner
+	public static int [][] SelectedRandomElementInDOM = new int[4][1000];  // SelectedRandomElementInDOM[i][j]: the selected random DOM element id using operator i in state j (max=1000 for now)
 
 	// SVM training set
 	ArrayList<ElementFeatures> trainingSetElementFeatures = new ArrayList<ElementFeatures>();
@@ -146,6 +152,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public TestSuiteExtension() {
 		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
+
+		for (int i=0; i<4; i++)
+			for (int j=0;j<1000;j++)
+				SelectedRandomElementInDOM[i][j]=-1;
 	}
 
 
@@ -528,12 +538,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						}
 
 
-						// Generate feature vector of the asserted element with label +1 to be used for training the SVM
-
-						// old version
-						// trainingSetElementFeatures.add(getAssertedElemFeatureVector(webElement));
-
-						// new version
+						// Generate feature vector of the asserted element with label +1 and add to dataset file to be used for training the SVM
 						addToTrainingSet(getAssertedElemFeatureVector(webElement));
 
 					}
@@ -547,7 +552,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					// adding an AssertedElemetPattern-level assertion for the original assertion
 					if (assertionAdded)
 						currentState.addAssertedElementPattern(generatePatternAssertion(aep, "AEP for Original")); 
-
 
 
 					break;
@@ -576,7 +580,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		// Dumping the feature vectore of asserted element into training dataset
 		// sample data format: <label> <featureIndex>:<featureValue>. E.g: +1 1:0.708333 2:1 3:1 4:-0.320755 5:-0.105023 ...
 		String label = elemFeatureVector.getClassLabel()>0 ? "+1" : "-1";
-		String sample = label + 
+		/*String sample = label + 
 				" 1:" + elemFeatureVector.getFreshness() +
 				" 2:" + elemFeatureVector.getTextImportance() +
 				" 3:" + String.format("%.3f", elemFeatureVector.getNormalBlockWidth()) +
@@ -586,6 +590,18 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				" 7:" + String.format("%.3f", elemFeatureVector.getInnerHtmlDensity()) +
 				" 8:" + String.format("%.3f", elemFeatureVector.getLinkDensity()) +
 				" 9:" + String.format("%.3f", elemFeatureVector.getBlockDensity());
+		 */
+		String sample = label + 
+				" 1:" + elemFeatureVector.getTextImportance() +
+				" 2:" + String.format("%.3f", elemFeatureVector.getNormalBlockWidth()) +
+				" 3:" + String.format("%.3f", elemFeatureVector.getNormalBlockHeight()) +
+				" 4:" + String.format("%.3f", elemFeatureVector.getNormalBlockCenterX()) +
+				" 5:" + String.format("%.3f", elemFeatureVector.getNormalBlockCenterY()) +
+				" 6:" + String.format("%.3f", elemFeatureVector.getInnerHtmlDensity()) +
+				" 7:" + String.format("%.3f", elemFeatureVector.getLinkDensity()) +
+				" 8:" + String.format("%.3f", elemFeatureVector.getBlockDensity());
+
+
 		try {
 			FileWriter fw = new FileWriter("trainingSet", true); //appending new data
 			fw.write(sample + "\n");
@@ -705,8 +721,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		int classLabel = -1;	// Default for block elements on manual-test states
 
-		if (manualTestPathsCreated==true)
-			classLabel = 0;		// These vectors are not going to be used for SVM training, they are stored to be used later for prediction step.
+		// No need for this. SVM does not consider label at the time of prediction
+		//if (manualTestPathsCreated==true)
+		//	classLabel = 0;		// These vectors are not going to be used for SVM training, they are stored to be used later for prediction step.
 
 		String[] blockTags = {"/div>", "/span>", "/p>", "/table>"};
 		//String[] listTags = {"/ul>", "/ol>", "/li>"};
@@ -744,69 +761,75 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 		// TODO: extract info from the block elements (div, span, p, and table)
+		String[] blocks = {"div", "span", "p", "table"};
 
-		// fresshness will be calculated based on previous state. If was not found in the previous state it is a new element
-		int freshness = 0, textImportance = 0; // 1: true, 0: false
+		for (int k=0; k<blockTags.length; k++){
 
-		List<WebElement> blockElements = browser.getBrowser().findElements(By.tagName("div"));
-		for (WebElement block: blockElements){
+			// fresshness will be calculated based on previous state. If was not found in the previous state it is a new element
+			int freshness = 0, textImportance = 0; // 1: true, 0: false
 
-			String xpath = getXPath(block);
+			List<WebElement> blockElements = browser.getBrowser().findElements(By.tagName(blocks[k]));
+			for (WebElement block: blockElements){
 
-			String blockInnerHTML = block.getAttribute("innerHTML");
-			double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
+				String xpath = getXPath(block);
 
-			double blockXPos = (double) block.getLocation().getX();
-			double blockYPos = (double) block.getLocation().getY();
-			double blockWidth = (double) block.getSize().getWidth();
-			double blockHeight = (double) block.getSize().getHeight();
+				String blockInnerHTML = block.getAttribute("innerHTML");
+				double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
 
-			double normalBlockWidth = blockWidth / bodyWidth;
-			double normalBlockHeight = blockHeight / bodyHeight;
-			double normalBlockCenterX = (blockXPos + blockWidth/2) / bodyWidth;
-			double normalBlockCenterY = (blockYPos + blockHeight/2) / bodyHeight;
+				double blockXPos = (double) block.getLocation().getX();
+				double blockYPos = (double) block.getLocation().getY();
+				double blockWidth = (double) block.getSize().getWidth();
+				double blockHeight = (double) block.getSize().getHeight();
 
-			int blockBlocksCount = 0, blockLinksCount = 0, blockTablesCount = 0;
-			for (int i=0; i<blockTags.length; i++){
-				Pattern p = Pattern.compile(blockTags[i]);
-				Matcher m = p.matcher(blockInnerHTML);
-				while (m.find())
-					blockBlocksCount++;
-			}	
-			for (int i=0; i<linkTags.length; i++){
-				Pattern p = Pattern.compile(linkTags[i]);
-				Matcher m = p.matcher(blockInnerHTML);
-				while (m.find())
-					blockLinksCount++;
-			}
-			for (int i=0; i<tableTags.length; i++){
-				Pattern p = Pattern.compile(tableTags[i]);
-				Matcher m = p.matcher(blockInnerHTML);
-				while (m.find())
-					blockTablesCount++;
-			}
-			double linkDensity = 0;
-			if (totalLinksCount!=0)
-				linkDensity = (double)blockLinksCount / (double)totalLinksCount;
-			double blockDensity = 0;
-			if (totalBlocksCount!=0)
-				blockDensity = (double)blockBlocksCount / (double)totalBlocksCount;
+				double normalBlockWidth = blockWidth / bodyWidth;
+				double normalBlockHeight = blockHeight / bodyHeight;
+				double normalBlockCenterX = (blockXPos + blockWidth/2) / bodyWidth;
+				double normalBlockCenterY = (blockYPos + blockHeight/2) / bodyHeight;
 
-			for (int i=0; i<phraseTags.length; i++){
-				if (blockInnerHTML.contains(phraseTags[i])){
-					textImportance = 1;
-					break;
+				int blockBlocksCount = 0, blockLinksCount = 0, blockTablesCount = 0;
+				for (int i=0; i<blockTags.length; i++){
+					Pattern p = Pattern.compile(blockTags[i]);
+					Matcher m = p.matcher(blockInnerHTML);
+					while (m.find())
+						blockBlocksCount++;
+				}	
+				for (int i=0; i<linkTags.length; i++){
+					Pattern p = Pattern.compile(linkTags[i]);
+					Matcher m = p.matcher(blockInnerHTML);
+					while (m.find())
+						blockLinksCount++;
 				}
+				for (int i=0; i<tableTags.length; i++){
+					Pattern p = Pattern.compile(tableTags[i]);
+					Matcher m = p.matcher(blockInnerHTML);
+					while (m.find())
+						blockTablesCount++;
+				}
+				double linkDensity = 0;
+				if (totalLinksCount!=0)
+					linkDensity = (double)blockLinksCount / (double)totalLinksCount;
+				double blockDensity = 0;
+				if (totalBlocksCount!=0)
+					blockDensity = (double)blockBlocksCount / (double)totalBlocksCount;
+
+				for (int i=0; i<phraseTags.length; i++){
+					if (blockInnerHTML.contains(phraseTags[i])){
+						textImportance = 1;
+						break;
+					}
+				}
+
+				ElementFeatures elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
+						normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
+
+				//System.out.println("features for element " + block + " is: " + elementFeatures);
+
+				DOMElementsFeatures.add(elementFeatures);
+
 			}
-
-			ElementFeatures elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
-					normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
-
-			//System.out.println("features for element " + block + " is: " + elementFeatures);
-
-			DOMElementsFeatures.add(elementFeatures);
 
 		}
+
 		return DOMElementsFeatures;
 	}
 
@@ -1064,7 +1087,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			sfg = loadSFG();
 		else
 			sfg = session.getStateFlowGraph();
-		
+
 
 		for (StateVertex s: sfg.getAllStates()){
 			for (AssertedElementPattern	aep: s.getAssertedElementPatters())
@@ -1083,12 +1106,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			// choosing top-k frequent features from the ArrayList to be written in the training set file
 			Collections.sort(trainingSetElementFeatures,new ElementFeatureComp());
-			int topK = 50;
-			for (ElementFeatures ef: trainingSetElementFeatures){
-				System.out.println(ef);
-				addToTrainingSet(ef);
-				if (topK-- == 0)
-					break;
+			for (int k = 0; k < 30; k++){
+				System.out.println(trainingSetElementFeatures.get(k));
+				addToTrainingSet(trainingSetElementFeatures.get(k));
 			}
 
 			// SVM training, generates trainingSet.model file
@@ -1230,12 +1250,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			model = svm.svm_load_model("trainingSet.model");
 			for (ElementFeatures ef: state.getElementFeatures()){
 
-				svm_node[] x = new svm_node[9];
-				for(int j=0;j<9;j++){
+				//svm_node[] x = new svm_node[9];
+				svm_node[] x = new svm_node[8];
+				//for(int j=0;j<9;j++){
+				for(int j=0;j<8;j++){
 					x[j] = new svm_node();
 					x[j].index = j+1;
 				}
 
+				/*
 				x[0].value = ef.getFreshness();
 				x[1].value = ef.getTextImportance();
 				x[2].value = ef.getNormalBlockWidth();
@@ -1245,6 +1268,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				x[6].value = ef.getInnerHtmlDensity();
 				x[7].value = ef.getLinkDensity();
 				x[8].value = ef.getBlockDensity();
+				 */
+
+				x[0].value = ef.getTextImportance();
+				x[1].value = ef.getNormalBlockWidth();
+				x[2].value = ef.getNormalBlockHeight();
+				x[3].value = ef.getNormalBlockCenterX();
+				x[4].value = ef.getNormalBlockCenterY();
+				x[5].value = ef.getInnerHtmlDensity();
+				x[6].value = ef.getLinkDensity();
+				x[7].value = ef.getBlockDensity();
+
 
 				int prediction = (int) svm.svm_predict(model,x);
 				if (prediction == 1)
@@ -1253,12 +1287,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
-		
+
 		return xpathList;
 	}
 
-	
-	
+
+
 	private AssertedElementPattern generatePatternAssertion(AssertedElementPattern aep, String howMatched) {
 		// pattern assertion on BODY is useless
 		if (aep.getTagName().toUpperCase().equals("BODY"))
@@ -1382,19 +1416,23 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
 					//System.out.println("//" + edge.toString());
 
+					// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
+					testMethod.addStatement("mutateDOMTree(" + edge.getSourceStateVertex().getId() + ");");
+
+					// Adding learned assertions (SVM predicting for a feature vector)
+					if (addLearnedAssertions){
+						ArrayList<String> xpathList = svmPredict(edge.getSourceStateVertex());
+						for (String xpath: xpathList){
+							testMethod.addStatement("assertTrue(isElementPresent(By.xpath(\"" + xpath +"\"))); // predicted assertion");
+							predictedAssertions++;
+							totalAssertions++;
+						}
+					}
+
 
 					// Adding assertions
 					if (edge.getSourceStateVertex().getAssertions().size()>0){
 
-						// Adding learned assertions (SVM predicting for a feature vector)
-						if (addLearnedAssertions){
-							ArrayList<String> xpathList = svmPredict(edge.getSourceStateVertex());
-							for (String xpath: xpathList){
-								testMethod.addStatement("assertTrue(isElementPresent(By.xpath(\"" + xpath +"\"))); // predicted assertion");
-								predictedAssertions++;
-								totalAssertions++;
-							}
-						}
 
 						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementPatters().size();i++){
 							String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
@@ -1410,11 +1448,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								origAndReusedAssertions++;
 								totalAssertions++;
 							}
-							
+
 							// Adding reused assertion to the method
 							if (addReusedAssertions){
 								if (assertionOringin.contains("reused assertion")){
-								testMethod.addStatement(assertion + "; // " + assertionOringin);
+									testMethod.addStatement(assertion + "; // " + assertionOringin);
 									reusedAssertions++;
 									ElementFullMatch++;
 									totalAssertions++;
@@ -1424,7 +1462,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// Adding generated assertion to the method
 							if (addGeneratedAssertions){
 								if (assertionOringin.contains("generated assertion")){
-									testMethod.addStatement(assertion + "; // " + assertionOringin);
+									//testMethod.addStatement("\n");
+									testMethod.addStatement(assertion + "; // " + assertionOringin+"\n");
 									generatedAssertions++;
 									totalAssertions++;
 									if (assertionOringin.contains("ElementTagAttMatch"))
@@ -1585,8 +1624,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void onFireEvent(CrawlerContext context, StateVertex stateBefore, Eventable eventable, StateVertex stateAfter) {
 
-		if (true)
-			return;
+		//if (true)
+		//	return;
 
 		// Calculating JS statement code coverage for feedback-directed exploration
 		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
@@ -1700,12 +1739,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				for (ElementFeatures currentEF : trainingSetElementFeatures){
 					if (currentEF.equals(ef)){
 						currentEF.increaseCount();
-						if (ef.getCount()==0)  // Change fresh to non-fresh
+						if (ef.getFreshness()==0)  // Change fresh to non-fresh
 							currentEF.setFreshness(0);
 						elementExist = true;
 						break;
 					}
-					if (currentEF.cosineSimilarity(ef)<0.3){
+					if (currentEF.cosineSimilarity(ef)<0.9){
 						elementExist = true;
 						break;
 					}					
@@ -1732,6 +1771,67 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	public static boolean getCoverageReport() {
 		return getCoverageReport;
+	}
+
+	// To be used for DOM mutation testing for the experiments in the paper
+	public static String mutateDOMTreeCode(int stateID) {
+		if (mutateDOM == false)
+			return null;
+
+		if (stateID!=StateToBeMutated)
+			return null;
+
+		/* DOM-based mutation operator
+			0) remove subtree
+			1) move subtree
+			2) remove subtree att
+			3) remove subtree text
+		 */
+
+		// generate code for DOM mutation, first choose a random DOM element
+
+		String jsCode = "function applyMutation(){ ";
+
+		jsCode += "randomElementID = Math.round(Math.random() * document.getElementsByTagName(\'*\').length); ";
+
+		// if this operator is done for the first time on this state
+		if (SelectedRandomElementInDOM[MutationOperatorCode][StateToBeMutated]==-1)
+			jsCode += "randomElement = document.getElementsByTagName(\'*\')[randomElementID]; ";
+		else
+			jsCode += "randomElement = document.getElementsByTagName(\'*\')[" + SelectedRandomElementInDOM[MutationOperatorCode][StateToBeMutated] + "]; ";
+
+		
+		switch(MutationOperatorCode){
+		case 0:
+			// remove parent and all its children
+			jsCode += "randomElement.parentNode.removeChild(randomElement);";
+			break;
+		case 1:
+			/* OLD VESION
+				// move subtree of a DOM node to a random node
+				jsCode += "anotherRandomElement = document.getElementsByTagName(\'*\')[Math.round(Math.random() * document.getElementsByTagName(\'*\').length)];";
+				jsCode += "anotherRandomElement.appendChild(randomElement);";
+			 */
+			/* NEW VESION */
+			// move subtree of a DOM node to a its grandparent node
+			jsCode += "randomElement.parentNode.parentNode.appendChild(randomElement);";
+			break;
+		case 2:
+			// remove attributes of of subtree of a DOM element
+			jsCode += "if ( randomElement.hasChildNodes() ) {  var children = randomElement.childNodes;  for (var i = 0; i < children.length; i++) {  if (children[i].hasAttributes()) { for (var j= children[i].attributes.length; j-->0;){ children[i].removeAttributeNode(children[i].attributes[j]); } } } }";
+			jsCode += "if ( randomElement.hasAttributes() ) { for (var i= randomElement.attributes.length; i-->0;){ randomElement.removeAttributeNode(randomElement.attributes[i]); }}";
+			break;
+		case 3:
+			// remove text of subtree of a DOM element
+			jsCode += "if ( randomElement.hasChildNodes() ) {  var children = randomElement.childNodes;  for (var i = 0; i < children.length; i++) {  children[i].innerHTML = \'\'; } }";
+			break;
+		}
+
+		//System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
+
+		jsCode += " return randomElementID;} return applyMutation();";
+
+		return jsCode;
 	}
 
 }
