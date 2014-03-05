@@ -114,6 +114,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	String appName = "photogallery";
 
 	static boolean loadSFGFromFile = true;
+	static boolean saveNewTrainingDatasetToFile = false;
 
 	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
@@ -122,10 +123,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
 	// DOM-mutation testing settings
-	static boolean mutateDOM = false;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
-	public static int MutationOperatorCode = 1; // DOM mutation operator is set via test suite runner
-	public static int StateToBeMutated = 0; // This is also set via test suite runner
+	static boolean mutateDOM = true;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
+	public static int MutationOperatorCode = 0; // DOM mutation operator is set via test suite runner
+	public static int StateToBeMutated = -1; // This is also set via test suite runner
 	public static int [][] SelectedRandomElementInDOM = new int[4][1000];  // SelectedRandomElementInDOM[i][j]: the selected random DOM element id using operator i in state j (max=1000 for now)
+
+	public static void initializeSelectedRandomElements(){
+		for (int i=0; i<4; i++)
+			for (int j=0;j<1000;j++)
+				SelectedRandomElementInDOM[i][j]=-1;
+	}
+
 
 	// SVM training set
 	ArrayList<ElementFeatures> trainingSetElementFeatures = new ArrayList<ElementFeatures>();
@@ -152,10 +160,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	public TestSuiteExtension() {
 		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
-
-		for (int i=0; i<4; i++)
-			for (int j=0;j<1000;j++)
-				SelectedRandomElementInDOM[i][j]=-1;
 	}
 
 
@@ -571,12 +575,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		manualTestPathsCreated = true;
 
-		CrawlSession session = firstConsumer.getContext().getSession();
-		saveSFG(session);
-
 	}
 
 	private void addToTrainingSet(ElementFeatures elemFeatureVector) {
+		if (saveNewTrainingDatasetToFile==false)
+			return;
+		
 		// Dumping the feature vectore of asserted element into training dataset
 		// sample data format: <label> <featureIndex>:<featureValue>. E.g: +1 1:0.708333 2:1 3:1 4:-0.320755 5:-0.105023 ...
 		String label = elemFeatureVector.getClassLabel()>0 ? "+1" : "-1";
@@ -599,7 +603,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				" 5:" + String.format("%.3f", elemFeatureVector.getNormalBlockCenterY()) +
 				" 6:" + String.format("%.3f", elemFeatureVector.getInnerHtmlDensity()) +
 				" 7:" + String.format("%.3f", elemFeatureVector.getLinkDensity()) +
-				" 8:" + String.format("%.3f", elemFeatureVector.getBlockDensity());
+				" 8:" + String.format("%.3f", elemFeatureVector.getNormalNumOfChildren());
 
 
 		try {
@@ -707,8 +711,24 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 
+
+		// storing parent and child info to be used in similar pattern assertions
+		Element SourceElement;
+		double normalNumOfChildren = 0;
+		try {
+			SourceElement = getElementFromXpath(xpath, browser);
+			int numOfChildren = SourceElement.getChildNodes().getLength();
+			normalNumOfChildren = (double) numOfChildren / 10.0;
+			if (normalNumOfChildren>1.0)
+				normalNumOfChildren = 1.0;
+		} catch (XPathExpressionException e) {
+			System.out.println("XPathExpressionException!");
+			e.printStackTrace();
+		}
+
+
 		ElementFeatures elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
-				normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
+				normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, normalNumOfChildren, classLabel);
 
 		System.out.println("features for element " + assertedElement + " is: " + elementFeatures);
 		return elementFeatures;
@@ -760,7 +780,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 
-		// TODO: extract info from the block elements (div, span, p, and table)
 		String[] blocks = {"div", "span", "p", "table"};
 
 		for (int k=0; k<blockTags.length; k++){
@@ -819,8 +838,26 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					}
 				}
 
-				ElementFeatures elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
-						normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, classLabel);
+				// storing parent and child info to be used in similar pattern assertions
+				Element SourceElement;
+				ElementFeatures elementFeatures = null;
+				double normalNumOfChildren = 0;
+				try {
+					SourceElement = getElementFromXpath(xpath, browser);
+					AssertedElementPattern aep = new AssertedElementPattern(SourceElement, "", xpath);
+					int numOfChildren = SourceElement.getChildNodes().getLength();
+					normalNumOfChildren = (double) numOfChildren / 10.0;
+					if (normalNumOfChildren>1.0)
+						normalNumOfChildren = 1.0;
+
+					elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
+							normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, normalNumOfChildren, classLabel);
+
+					elementFeatures.addElementPatternAssertion(generatePatternAssertion(aep, "learned assertion").getAssertion());
+				} catch (XPathExpressionException e) {
+					System.out.println("XPathExpressionException!");
+					e.printStackTrace();
+				}
 
 				//System.out.println("features for element " + block + " is: " + elementFeatures);
 
@@ -836,8 +873,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 	private void saveSFG(CrawlSession session) {
-		LOG.info("Saving the SFG...");
+		LOG.info("Saving the SFG...");		
 		StateFlowGraph sfg = session.getStateFlowGraph();
+		// saving used IDs to be used for mutation testing
+		for (StateVertex s: sfg.getAllStates())
+			writeStateIDToFile(Integer.toString(s.getId()));
+		
 		FileOutputStream fos = null;
 		ObjectOutputStream out = null;
 		String sfgFileName = "sfg.ser";
@@ -1085,9 +1126,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		StateFlowGraph sfg;
 		if (loadSFGFromFile)
 			sfg = loadSFG();
-		else
+		else{
 			sfg = session.getStateFlowGraph();
-
+			saveSFG(session);
+		}
 
 		for (StateVertex s: sfg.getAllStates()){
 			for (AssertedElementPattern	aep: s.getAssertedElementPatters())
@@ -1106,14 +1148,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 			// choosing top-k frequent features from the ArrayList to be written in the training set file
 			Collections.sort(trainingSetElementFeatures,new ElementFeatureComp());
-			for (int k = 0; k < 30; k++){
-				System.out.println(trainingSetElementFeatures.get(k));
+			int maxToSelect = 40;
+			if (maxToSelect > trainingSetElementFeatures.size())
+				maxToSelect = trainingSetElementFeatures.size();
+			for (int k = 0; k < maxToSelect; k++){
+				//System.out.println(trainingSetElementFeatures.get(k));
 				addToTrainingSet(trainingSetElementFeatures.get(k));
 			}
-
-			// SVM training, generates trainingSet.model file
-			svmTrain();
 		}
+
+		// SVM training, generates trainingSet.model file
+		svmTrain();
 
 		// DOM-based assertion generation part
 		for (StateVertex s: sfg.getAllStates()){
@@ -1241,7 +1286,53 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 	}
 
+
 	// SVM predicting for a feature vector
+	private boolean svmPredict(ElementFeatures ef) {
+		svm_model model;
+		try {
+			model = svm.svm_load_model("trainingSet.model");
+
+			svm_node[] x = new svm_node[8];
+			for(int j=0;j<8;j++){
+				x[j] = new svm_node();
+				x[j].index = j+1;
+			}
+
+			/*
+				x[0].value = ef.getFreshness();
+				x[1].value = ef.getTextImportance();
+				x[2].value = ef.getNormalBlockWidth();
+				x[3].value = ef.getNormalBlockHeight();
+				x[4].value = ef.getNormalBlockCenterX();
+				x[5].value = ef.getNormalBlockCenterY();
+				x[6].value = ef.getInnerHtmlDensity();
+				x[7].value = ef.getLinkDensity();
+				x[8].value = ef.getBlockDensity();
+			 */
+
+			x[0].value = ef.getTextImportance();
+			x[1].value = ef.getNormalBlockWidth();
+			x[2].value = ef.getNormalBlockHeight();
+			x[3].value = ef.getNormalBlockCenterX();
+			x[4].value = ef.getNormalBlockCenterY();
+			x[5].value = ef.getInnerHtmlDensity();
+			x[6].value = ef.getLinkDensity();
+			//x[7].value = ef.getBlockDensity();
+			x[7].value = ef.getNormalNumOfChildren();
+
+			int prediction = (int) svm.svm_predict(model,x);
+			if (prediction == 1){
+				return true;
+			}
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+
+		return false;
+	}
+
+	// SVM predicting for feature vectors in a state
 	private ArrayList<String> svmPredict(StateVertex state) {
 		ArrayList<String> xpathList = new ArrayList<String>();
 
@@ -1250,9 +1341,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			model = svm.svm_load_model("trainingSet.model");
 			for (ElementFeatures ef: state.getElementFeatures()){
 
-				//svm_node[] x = new svm_node[9];
 				svm_node[] x = new svm_node[8];
-				//for(int j=0;j<9;j++){
 				for(int j=0;j<8;j++){
 					x[j] = new svm_node();
 					x[j].index = j+1;
@@ -1277,7 +1366,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				x[4].value = ef.getNormalBlockCenterY();
 				x[5].value = ef.getInnerHtmlDensity();
 				x[6].value = ef.getLinkDensity();
-				x[7].value = ef.getBlockDensity();
+				//x[7].value = ef.getBlockDensity();
+				x[7].value = ef.getNormalNumOfChildren();
 
 
 				int prediction = (int) svm.svm_predict(model,x);
@@ -1419,14 +1509,40 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
 					testMethod.addStatement("mutateDOMTree(" + edge.getSourceStateVertex().getId() + ");");
 
+
+					// Adding original assertion to the method
+					if (edge.getSourceStateVertex().getAssertions().size()>0){
+						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementPatters().size();i++){
+							String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
+							String assertionOringin = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+							if (assertionOringin.contains("original assertion")){
+								testMethod.addStatement(assertion + "; // " + assertionOringin);
+								origAndReusedAssertions++;
+								totalAssertions++;
+							}
+						}
+
+					}
+
 					// Adding learned assertions (SVM predicting for a feature vector)
 					if (addLearnedAssertions){
-						ArrayList<String> xpathList = svmPredict(edge.getSourceStateVertex());
+						// Adding SE assertion
+						/*ArrayList<String> xpathList = svmPredict(edge.getSourceStateVertex());
 						for (String xpath: xpathList){
 							testMethod.addStatement("assertTrue(isElementPresent(By.xpath(\"" + xpath +"\"))); // predicted assertion");
 							predictedAssertions++;
 							totalAssertions++;
+						}*/
+						// Adding SP assertion
+						for (ElementFeatures ef: edge.getSourceStateVertex().getElementFeatures()){
+							if (svmPredict(ef)==true)
+								if (ef.getElementPatternAssertion()!=null){
+									testMethod.addStatement(ef.getElementPatternAssertion() + "; // predicted pattern assertion");
+									predictedAssertions++;
+									totalAssertions++;
+								}
 						}
+
 					}
 
 
@@ -1441,13 +1557,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							// problem with Claroline app
 							if (edge.getSourceStateVertex().getId()==0 && assertion.equals("assertTrue(isElementPresent(By.linkText(\"Logout\")))"))
 								continue;
-
-							// Adding original assertion to the method
-							if (assertionOringin.contains("original assertion")){
-								testMethod.addStatement(assertion + "; // " + assertionOringin);
-								origAndReusedAssertions++;
-								totalAssertions++;
-							}
 
 							// Adding reused assertion to the method
 							if (addReusedAssertions){
@@ -1624,8 +1733,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void onFireEvent(CrawlerContext context, StateVertex stateBefore, Eventable eventable, StateVertex stateAfter) {
 
-		//if (true)
-		//	return;
+		if (true)
+			return;
 
 		// Calculating JS statement code coverage for feedback-directed exploration
 		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
@@ -1646,6 +1755,33 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex vertex) {
 
+		// Getting feature vector of block DOM elements [label=-1 (if manualTestPath is not creatred) and 0 otherwise], to be predicted by the trained SVM.
+		ArrayList<ElementFeatures> newElementsFeatures = getDOMElementsFeatures();
+		// Adding feature vectors to the state
+		for (ElementFeatures ef: newElementsFeatures){
+			vertex.addElementFeatures(ef);
+
+			// Adding feature vector of block DOM elements with label -1 (from manual test states) to be used for training the SVM.
+			boolean elementExist = false;
+			if (manualTestPathsCreated==false){
+				for (ElementFeatures currentEF : trainingSetElementFeatures){
+					if (currentEF.equals(ef)){
+						currentEF.increaseCount();
+						elementExist = true;
+						break;
+					}
+					if (currentEF.cosineSimilarity(ef)<0.7){
+						elementExist = true;
+						break;
+					}					
+				}
+				if (elementExist == false)
+					trainingSetElementFeatures.add(ef);
+			}
+		}
+		
+		
+		// FeedEx is no more used for exploration
 		if (true)
 			return;
 
@@ -1721,10 +1857,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	@Override
 	public boolean isDomChanged(CrawlerContext context, StateVertex stateBefore, Eventable e, StateVertex stateAfter) {
+		
+		// The idea of using freshness was not very effective thus removed from features and addElementFeatures for state moved to onNewState
+		
+		
 		// Detecting which elements are fresh (are in the current DOM state but not in the previous DOM state) 
 		// extract all block elements, generate features vectors, determine new ones, add those with freshnes = 1 to set of freshElement
 
-		ArrayList<ElementFeatures> oldElementsFeatures = stateBefore.getElementFeatures();
+		/*
+		HashSet<ElementFeatures> oldElementsFeatures = stateBefore.getElementFeatures();
 		// Getting feature vector of block DOM elements [label=-1 (if manualTestPath is not creatred) and 0 otherwise], to be predicted by the trained SVM.
 		ArrayList<ElementFeatures> newElementsFeatures = getDOMElementsFeatures();
 		// Adding feature vectors to the state
@@ -1752,7 +1893,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				if (elementExist == false)
 					trainingSetElementFeatures.add(ef);
 			}
-		}
+		}*/
 
 		// default DOM comparison behavior
 		return !stateAfter.equals(stateBefore);
@@ -1785,22 +1926,35 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			0) remove subtree
 			1) move subtree
 			2) remove subtree att
-			3) remove subtree text
+			3) remove subtree text -> remove innerHTML
 		 */
 
 		// generate code for DOM mutation, first choose a random DOM element
 
 		String jsCode = "function applyMutation(){ ";
 
-		jsCode += "randomElementID = Math.round(Math.random() * document.getElementsByTagName(\'*\').length); ";
+		//jsCode += "randomElementID = Math.round(Math.random() * document.getElementsByTagName(\'*\').length); ";
+		//jsCode += "randomElementID = 281; ";
 
 		// if this operator is done for the first time on this state
 		if (SelectedRandomElementInDOM[MutationOperatorCode][StateToBeMutated]==-1)
-			jsCode += "randomElement = document.getElementsByTagName(\'*\')[randomElementID]; ";
+			jsCode += "randomElementID = Math.round(Math.random() * document.getElementsByTagName(\'*\').length); ";
 		else
-			jsCode += "randomElement = document.getElementsByTagName(\'*\')[" + SelectedRandomElementInDOM[MutationOperatorCode][StateToBeMutated] + "]; ";
+			jsCode += "randomElementID = " + SelectedRandomElementInDOM[MutationOperatorCode][StateToBeMutated] + "; ";
 
-		
+
+		jsCode += "randomElement = document.getElementsByTagName(\'*\')[randomElementID]; ";
+
+		// if this operator is done for the first time on this state
+		//if (SelectedRandomElementInDOM[MutationOperatorCode][StateToBeMutated]==-1){
+		//jsCode += "randomElementID = Math.round(Math.random() * document.getElementsByTagName(\'*\').length); ";
+		jsCode += "randomElement = document.getElementsByTagName(\'*\')[randomElementID]; ";
+		/*}
+		else{
+			jsCode += "randomElement = " + SelectedRandomElementInDOM[MutationOperatorCode][StateToBeMutated] + "; ";
+			jsCode += "randomElement = document.getElementsByTagName(\'*\')[" + SelectedRandomElementInDOM[MutationOperatorCode][StateToBeMutated] + "]; ";
+		}*/
+
 		switch(MutationOperatorCode){
 		case 0:
 			// remove parent and all its children
@@ -1812,9 +1966,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				jsCode += "anotherRandomElement = document.getElementsByTagName(\'*\')[Math.round(Math.random() * document.getElementsByTagName(\'*\').length)];";
 				jsCode += "anotherRandomElement.appendChild(randomElement);";
 			 */
-			/* NEW VESION */
+			/* NEW VESION: seems to have bug! */
 			// move subtree of a DOM node to a its grandparent node
 			jsCode += "randomElement.parentNode.parentNode.appendChild(randomElement);";
+			/* NEW VESION */
+			// move subtree of a DOM node to a its neighbor node
+			//jsCode += "document.getElementsByTagName(\'*\')[10].appendChild(randomElement);";
+
+
 			break;
 		case 2:
 			// remove attributes of of subtree of a DOM element
@@ -1827,11 +1986,25 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			break;
 		}
 
-		//System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
+		System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
 
 		jsCode += " return randomElementID;} return applyMutation();";
 
+		System.out.println("jsCode: " + jsCode);
+
 		return jsCode;
+	}
+
+	
+	public void writeStateIDToFile(String string) {
+		try {
+			FileWriter fw = new FileWriter("StateIDs.txt", true);
+			fw.write(string + "\n");
+			fw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.err.println("IOException: " + e.getMessage());
+		}
 	}
 
 }
