@@ -1834,6 +1834,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 				// adding the test method to the file
 				testMethods.add(testMethod);
+				
+				String packagename = "com.crawljax.plugins.testsuiteextension.generated." + testSuiteNameToGenerate;
 
 				String TEST_SUITE_PATH = "src/test/java/com/crawljax/plugins/testsuiteextension/generated/" + testSuiteNameToGenerate;
 				
@@ -1845,7 +1847,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					String fileName = null;
 
 					JavaTestGenerator generator =
-							new JavaTestGenerator(CLASS_NAME, sfg.getInitialState().getUrl(), testMethods);
+							new JavaTestGenerator(packagename, CLASS_NAME, sfg.getInitialState().getUrl(), testMethods);
 
 					fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
 

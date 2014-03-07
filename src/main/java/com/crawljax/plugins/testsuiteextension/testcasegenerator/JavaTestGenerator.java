@@ -24,14 +24,16 @@ public class JavaTestGenerator {
 	private final VelocityEngine engine;
 	private final VelocityContext context;
 	private final String className;
+	private String packagename;
 
 	/**
+	 * @param packagename
 	 * @param className
 	 * @param url
 	 * @param testMethods 
 	 * @throws Exception
 	 */
-	public JavaTestGenerator(String className, String url, ArrayList<TestMethod> testMethods) throws Exception {
+	public JavaTestGenerator(String packagename, String className, String url, ArrayList<TestMethod> testMethods) throws Exception {
 
 	//public JavaTestGenerator(String className, String url, List<TestMethod> testMethods,
 	//      CrawljaxConfiguration configuration) throws Exception {
@@ -45,7 +47,9 @@ public class JavaTestGenerator {
 		engine.init();
 		context = new VelocityContext();
 		this.className = className;
+		this.packagename = packagename;
 		context.put("date", new Date().toString());
+		context.put("packagename", packagename);
 		context.put("classname", className);
 		context.put("url", url);
 		context.put("testMethods", testMethods);
