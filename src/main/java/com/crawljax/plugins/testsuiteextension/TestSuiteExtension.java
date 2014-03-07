@@ -113,12 +113,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	//String appName = "claroline";
 	String appName = "photogallery";
 
-	static boolean loadSFGFromFile = true;
+	// one should only be true!
+	static boolean loadInitialSFGFromFile = false;
+	static boolean loadExtendedSFGFromFile = true;
+	
 	static boolean saveNewTrainingDatasetToFile = false;
 
 	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addLearnedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addGeneratedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addLearnedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
@@ -126,12 +129,16 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	static boolean mutateDOM = true;  // on DOM-based mutation testing to randomly mutate current DOM state (default should be false)
 	public static int MutationOperatorCode = 0; // DOM mutation operator is set via test suite runner
 	public static int StateToBeMutated = -1; // This is also set via test suite runner
-	public static int [][] SelectedRandomElementInDOM = new int[4][1000];  // SelectedRandomElementInDOM[i][j]: the selected random DOM element id using operator i in state j (max=1000 for now)
+	public static int [][] SelectedRandomElementInDOM = new int[4][500];  // SelectedRandomElementInDOM[i][j]: the selected random DOM element id using operator i in state j (max=1000 for now)
 
 	public static void initializeSelectedRandomElements(){
 		for (int i=0; i<4; i++)
-			for (int j=0;j<1000;j++)
+			for (int j=0;j<500;j++)
 				SelectedRandomElementInDOM[i][j]=-1;
+	}
+
+	public static int [][] getSelectedRandomElements(){
+		return SelectedRandomElementInDOM;
 	}
 
 
@@ -308,9 +315,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	@Override
 	public void initialPathExecution(CrawljaxConfiguration conf, CrawlTaskConsumer firstConsumer) {
-		if (loadSFGFromFile)
+		if (loadInitialSFGFromFile)
 			return;
-
+		if (loadExtendedSFGFromFile)
+			return;
+		
+		
 		int numOfTestCases = 0;
 
 		browser = firstConsumer.getContext().getBrowser();
@@ -574,13 +584,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		finalReport += "#transitions in the SFG after generating happy paths: " + Integer.toString(firstConsumer.getContext().getSession().getStateFlowGraph().getAllEdges().size()) + "\n";
 
 		manualTestPathsCreated = true;
+		
+		CrawlSession session = firstConsumer.getContext().getSession();
+
+		saveInitialSFG(session);
 
 	}
 
 	private void addToTrainingSet(ElementFeatures elemFeatureVector) {
 		if (saveNewTrainingDatasetToFile==false)
 			return;
-		
+
 		// Dumping the feature vectore of asserted element into training dataset
 		// sample data format: <label> <featureIndex>:<featureValue>. E.g: +1 1:0.708333 2:1 3:1 4:-0.320755 5:-0.105023 ...
 		String label = elemFeatureVector.getClassLabel()>0 ? "+1" : "-1";
@@ -853,7 +867,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
 							normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, normalNumOfChildren, classLabel);
 
-					elementFeatures.addElementPatternAssertion(generatePatternAssertion(aep, "learned assertion").getAssertion());
+					elementFeatures.addElementPatternAssertion(generatePatternAssertion(aep, "SimilarAssertion").getAssertion());
 				} catch (XPathExpressionException e) {
 					System.out.println("XPathExpressionException!");
 					e.printStackTrace();
@@ -872,16 +886,39 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 
-	private void saveSFG(CrawlSession session) {
+	private void saveInitialSFG(CrawlSession session) {
 		LOG.info("Saving the SFG...");		
 		StateFlowGraph sfg = session.getStateFlowGraph();
 		// saving used IDs to be used for mutation testing
 		for (StateVertex s: sfg.getAllStates())
-			writeStateIDToFile(Integer.toString(s.getId()));
-		
+			writeMPStateIDToFile(Integer.toString(s.getId()));
+
 		FileOutputStream fos = null;
 		ObjectOutputStream out = null;
-		String sfgFileName = "sfg.ser";
+		String sfgFileName = "sfg_init.ser";
+		// Save the SFG to file
+		try {
+			fos = new FileOutputStream(sfgFileName);
+			out = new ObjectOutputStream(fos);
+			out.writeObject(sfg);
+			out.close();
+			LOG.info("TestSuiteExtension successfully wrote SFG to sfg.ser file");
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+	}
+
+	
+	private void saveExtendedSFG(CrawlSession session) {
+		LOG.info("Saving the SFG...");		
+		StateFlowGraph sfg = session.getStateFlowGraph();
+		// saving used IDs to be used for mutation testing
+		for (StateVertex s: sfg.getAllStates())
+			writeEPStateIDToFile(Integer.toString(s.getId()));
+
+		FileOutputStream fos = null;
+		ObjectOutputStream out = null;
+		String sfgFileName = "sfg_extend.ser";
 		// Save the SFG to file
 		try {
 			fos = new FileOutputStream(sfgFileName);
@@ -895,11 +932,35 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	}
 
 
-	private StateFlowGraph loadSFG() {
+	private StateFlowGraph loadInitialSFG() {
 		LOG.info("Loading the SFG...");
 		FileInputStream fis = null;
 		ObjectInputStream in = null;
-		String sfgFileName = "sfg.ser";
+		String sfgFileName = "sfg_init.ser";
+		// Read the SFG from file for testing
+		StateFlowGraph sfg = null;
+		try {
+			fis = new FileInputStream(sfgFileName);
+			in = new ObjectInputStream(fis);
+			sfg = (StateFlowGraph) in.readObject();
+			in.close();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+		//LOG.info(Serializer.toPrettyJson(sfg));
+		//if (Serializer.toPrettyJson(sfg).equals(Serializer.toPrettyJson(sfg2)))
+		//	LOG.info("ERROR!");
+
+		return sfg;
+
+	}
+
+	private StateFlowGraph loadExtendedSFG() {
+		LOG.info("Loading the SFG...");
+		FileInputStream fis = null;
+		ObjectInputStream in = null;
+		String sfgFileName = "sfg_extend.ser";
 		// Read the SFG from file for testing
 		StateFlowGraph sfg = null;
 		try {
@@ -1124,11 +1185,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("List of asserted element paterns in assertedElementPatterns:");
 
 		StateFlowGraph sfg;
-		if (loadSFGFromFile)
-			sfg = loadSFG();
+		if (loadInitialSFGFromFile)
+			sfg = loadInitialSFG();
+		else if (loadExtendedSFGFromFile)
+			sfg = loadExtendedSFG();
 		else{
 			sfg = session.getStateFlowGraph();
-			saveSFG(session);
+			saveExtendedSFG(session);
 		}
 
 		for (StateVertex s: sfg.getAllStates()){
@@ -1143,7 +1206,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("***************");
 
 
-		if (!loadSFGFromFile){
+		if (!loadInitialSFGFromFile && !loadExtendedSFGFromFile){
 			System.out.println("Training the SVM for assertion prediction...");
 
 			// choosing top-k frequent features from the ArrayList to be written in the training set file
@@ -1436,7 +1499,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				patternCheckAssertion += "\"))));\n";
 		}
 
-		if (howMatched.equals("PatternTagMatch"))
+		if (howMatched.equals("PatternTagMatch") || howMatched.equals("SimilarAssertion"))
 			patternCheckAssertion += "\t\t\tassertTrue(isElementPatternTagPresent(parentElement , element, childrenElements))";
 		else
 			patternCheckAssertion += "\t\t\tassertTrue(isElementPatternFullPresent(parentElement , element, childrenElements))";
@@ -1537,7 +1600,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						for (ElementFeatures ef: edge.getSourceStateVertex().getElementFeatures()){
 							if (svmPredict(ef)==true)
 								if (ef.getElementPatternAssertion()!=null){
-									testMethod.addStatement(ef.getElementPatternAssertion() + "; // predicted pattern assertion");
+									String elementPatternAssertion = ef.getElementPatternAssertion();
+									elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
+									testMethod.addStatement(elementPatternAssertion + "; // predicted pattern assertion");
 									predictedAssertions++;
 									totalAssertions++;
 								}
@@ -1779,8 +1844,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					trainingSetElementFeatures.add(ef);
 			}
 		}
-		
-		
+
+
 		// FeedEx is no more used for exploration
 		if (true)
 			return;
@@ -1857,10 +1922,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	@Override
 	public boolean isDomChanged(CrawlerContext context, StateVertex stateBefore, Eventable e, StateVertex stateAfter) {
-		
+
 		// The idea of using freshness was not very effective thus removed from features and addElementFeatures for state moved to onNewState
-		
-		
+
+
 		// Detecting which elements are fresh (are in the current DOM state but not in the previous DOM state) 
 		// extract all block elements, generate features vectors, determine new ones, add those with freshnes = 1 to set of freshElement
 
@@ -1986,25 +2051,48 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			break;
 		}
 
-		System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
+		//System.out.println("MutationOperatorCode " + MutationOperatorCode + " applied!");
 
 		jsCode += " return randomElementID;} return applyMutation();";
 
-		System.out.println("jsCode: " + jsCode);
+		//System.out.println("jsCode: " + jsCode);
 
 		return jsCode;
 	}
 
-	
-	public void writeStateIDToFile(String string) {
+
+	public void writeMPStateIDToFile(String string) {
 		try {
-			FileWriter fw = new FileWriter("StateIDs.txt", true);
+			FileWriter fw = new FileWriter("MPStateIDs.txt", true);
 			fw.write(string + "\n");
 			fw.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.err.println("IOException: " + e.getMessage());
 		}
+	}
+
+
+	public void writeEPStateIDToFile(String string) {
+		try {
+			FileWriter fw = new FileWriter("EPStateIDs.txt", true);
+			fw.write(string + "\n");
+			fw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.err.println("IOException: " + e.getMessage());
+		}
+	}
+	
+	
+	public static void setSelectedRandomElements(
+			int[][] selectedRandomElementInDOM2) {
+		SelectedRandomElementInDOM = selectedRandomElementInDOM2;
+		
+		for (int i=0; i<4; i++)
+			for (int j=0;j<100;j++)
+				System.out.println(SelectedRandomElementInDOM[i][j]);
+		
 	}
 
 }
