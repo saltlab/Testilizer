@@ -59,8 +59,9 @@ public class SeleniumInstrumentor {
 	public static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
 
 	//String appName = "claroline";
-	String appName = "photogallery";
-	
+	//String appName = "photogallery";
+	String appName = "wolfcms";
+
 	
 	public SeleniumInstrumentor() {
 	}

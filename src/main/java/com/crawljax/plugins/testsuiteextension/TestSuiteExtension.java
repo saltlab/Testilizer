@@ -111,9 +111,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 * Settings for my experiments
 	 */
 	//String appName = "claroline";
-	String appName = "photogallery";
+	//String appName = "photogallery";
+	String appName = "wolfcms";
 
-	// one should only be true!
+	// one should only be true! if two are false then creates sfg files
 	static boolean loadInitialSFGFromFile = false;
 	static boolean loadExtendedSFGFromFile = true;
 	
@@ -436,10 +437,18 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					// storing input values for an element to be clicked later
 					String inputValue = methodValue.get(1);
 					// dealing with random input data
+					
+					
+					
 					if (inputValue.equals("$RandValue")){
-						inputValue = "RND-" + new RandomInputValueGenerator().getRandomString(4);
+						inputValue = "RND" + new RandomInputValueGenerator().getRandomString(4);
 						System.out.println("Random string " + inputValue + " generated for inputValue");
 					}
+					if (inputValue.equals("$RandValue@example.com")){  // Only the case for wolfcms app for unique email address
+						inputValue = "RND" + new RandomInputValueGenerator().getRandomString(4) + "@example.com";
+						System.out.println("Random string " + inputValue + " generated for inputValue");
+					}
+					
 					// setting form input values for the Eventable
 					//System.out.println("adding " + inputValue + " to inputs");
 					relatedFormInputs.add(new FormInput(webElement.getTagName() , new Identification(how, howValue), inputValue));
@@ -1685,8 +1694,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 									testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).clear();");
 
-									if (sendValue.startsWith("RND-")){
-										testMethod.addStatement("String RandValue = \"RND-\" + new RandomInputValueGenerator().getRandomString(4);");
+									if (sendValue.startsWith("RND") && sendValue.contains("@example.com")){ // only for wolfCMS case of unique email address
+										testMethod.addStatement("String RandValue = \"RND\" + new RandomInputValueGenerator().getRandomString(4) + \"@example.com\";");
+										testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).sendKeys(RandValue);");
+									}
+									if (sendValue.startsWith("RND")){
+										testMethod.addStatement("String RandValue = \"RND\" + new RandomInputValueGenerator().getRandomString(4);");
 										testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).sendKeys(RandValue);");
 									}else
 										testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).sendKeys(\"" + sendValue + "\");");
