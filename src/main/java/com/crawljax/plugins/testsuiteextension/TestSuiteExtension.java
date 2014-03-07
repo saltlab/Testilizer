@@ -111,16 +111,18 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 * Settings for my experiments
 	 */
 	//String appName = "claroline";
-	//String appName = "photogallery";
-	String appName = "wolfcms";
+	String appName = "photogallery";
+	//String appName = "wolfcms";
+
+	private String testSuiteNameToGenerate = appName + "_MP_orig";
 
 	// one should only be true! if two are false then creates sfg files
-	static boolean loadInitialSFGFromFile = false;
-	static boolean loadExtendedSFGFromFile = true;
+	static boolean loadInitialSFGFromFile = true;
+	static boolean loadExtendedSFGFromFile = false;
 	
 	static boolean saveNewTrainingDatasetToFile = false;
 
-	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addReusedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addGeneratedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addLearnedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
 
@@ -163,6 +165,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	private Map<String,ArrayList<Integer>> JSCountList = new Hashtable<String,ArrayList<Integer>>(); 
 
 	private String finalReport ="";
+
 
 
 	public TestSuiteExtension() {
@@ -1568,9 +1571,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				//For each path to the sink node
 				TestMethod testMethod = new TestMethod("method" + Integer.toString(counter));
 
+				int pathLength = p.getEdgeList().size();
+				int pathCount = 0;
 				for (Eventable edge : p.getEdgeList()) {
 					//For each eventable in the path
-
+					pathCount++;
+					// This is to store which states were observed in this test case
+					
+					
+					writeStatesForTestCasesToFile("public static int [][] " + testSuiteNameToGenerate + " = new int[100][300];");
+					writeStatesForTestCasesToFile(testSuiteNameToGenerate + "[" + counter + "][" + Integer.toString(edge.getSourceStateVertex().getId()) + "] = 1;");
+					
 					testMethod.addStatement("//From state " + Integer.toString(edge.getSourceStateVertex().getId()) 
 							+ " to state " + Integer.toString(edge.getTargetStateVertex().getId()));
 					testMethod.addStatement("//" + edge.toString());
@@ -1726,13 +1737,106 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						how = "partialLinkText";
 
 					testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).click();");
-				}
+					
+					
+									
+					/*
+					 * Now for the sink nodes, add mutations and assertions:
+					 */
+					if (pathCount==pathLength){
+						testMethod.addStatement("//Sink node at state " + Integer.toString(edge.getTargetStateVertex().getId()));
 
+						writeStatesForTestCasesToFile(testSuiteNameToGenerate + "[" + counter + "][" + Integer.toString(edge.getTargetStateVertex().getId()) + "] = 1;");
+										
+						// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
+						testMethod.addStatement("mutateDOMTree(" + edge.getTargetStateVertex().getId() + ");");
+
+
+						// Adding original assertion to the method
+						if (edge.getTargetStateVertex().getAssertions().size()>0){
+							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
+								String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
+								String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+								if (assertionOringin.contains("original assertion")){
+									testMethod.addStatement(assertion + "; // " + assertionOringin);
+									origAndReusedAssertions++;
+									totalAssertions++;
+								}
+							}
+
+						}
+
+						// Adding learned assertions (SVM predicting for a feature vector)
+						if (addLearnedAssertions){
+							// Adding SP assertion
+							for (ElementFeatures ef: edge.getTargetStateVertex().getElementFeatures()){
+								if (svmPredict(ef)==true)
+									if (ef.getElementPatternAssertion()!=null){
+										String elementPatternAssertion = ef.getElementPatternAssertion();
+										elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
+										testMethod.addStatement(elementPatternAssertion + "; // predicted pattern assertion");
+										predictedAssertions++;
+										totalAssertions++;
+									}
+							}
+
+						}
+
+
+						// Adding assertions
+						if (edge.getTargetStateVertex().getAssertions().size()>0){
+
+
+							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
+								String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
+								String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+
+
+								// Adding reused assertion to the method
+								if (addReusedAssertions){
+									if (assertionOringin.contains("reused assertion")){
+										testMethod.addStatement(assertion + "; // " + assertionOringin);
+										reusedAssertions++;
+										ElementFullMatch++;
+										totalAssertions++;
+									}
+								}
+
+								// Adding generated assertion to the method
+								if (addGeneratedAssertions){
+									if (assertionOringin.contains("generated assertion")){
+										//testMethod.addStatement("\n");
+										testMethod.addStatement(assertion + "; // " + assertionOringin+"\n");
+										generatedAssertions++;
+										totalAssertions++;
+										if (assertionOringin.contains("ElementTagAttMatch"))
+											ElementTagAttMatch++;
+										//if (assertionOringin.contains("ElementTagMatch"))
+										//	ElementTagMatch++;
+										if (assertionOringin.contains("PatternFullMatch"))
+											PatternFullMatch++;
+										if (assertionOringin.contains("PatternTagAttMatch"))
+											PatternTagAttMatch++;
+										if (assertionOringin.contains("PatternTagMatch"))
+											PatternTagMatch++;
+										if (assertionOringin.contains("AEP for Original"))
+											AEPforOriginalAssertions++;									
+									}
+								}
+
+							}
+						}
+					}
+					
+					
+				}				
+				
 
 				// adding the test method to the file
 				testMethods.add(testMethod);
 
-				String TEST_SUITE_PATH = "src/test/java/generated";
+				String TEST_SUITE_PATH = "src/test/java/com/crawljax/plugins/testsuiteextension/generated/" + testSuiteNameToGenerate;
+				
 				String CLASS_NAME = "GeneratedTestCase"+ Integer.toString(counter);
 				String FILE_NAME_TEMPLATE = "TestCase.vm";
 
@@ -2097,6 +2201,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 	}
 	
+	
+	public void writeStatesForTestCasesToFile(String string) {
+		try {
+			FileWriter fw = new FileWriter("StatesForTestCases.txt", true);
+			fw.write(string + "\n");
+			fw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.err.println("IOException: " + e.getMessage());
+		}
+	}
 	
 	public static void setSelectedRandomElements(
 			int[][] selectedRandomElementInDOM2) {
