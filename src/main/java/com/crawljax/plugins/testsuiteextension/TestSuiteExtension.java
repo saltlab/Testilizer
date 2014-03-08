@@ -114,17 +114,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	String appName = "photogallery";
 	//String appName = "wolfcms";
 
-	private String testSuiteNameToGenerate = appName + "_MP_orig";
+	private String testSuiteNameToGenerate = appName + "_EP_learned";
 
 	// one should only be true! if two are false then creates sfg files
-	static boolean loadInitialSFGFromFile = true;
-	static boolean loadExtendedSFGFromFile = false;
+	static boolean loadInitialSFGFromFile = false;
+	static boolean loadExtendedSFGFromFile = true;
 	
 	static boolean saveNewTrainingDatasetToFile = false;
 
 	static boolean addReusedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addGeneratedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addLearnedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addLearnedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
@@ -1557,6 +1557,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	private void generateTestSuite(StateFlowGraph sfg) {
 
+		// This is to store which states were observed in this test case
+		writeStatesForTestCasesToFile("int [][] " + testSuiteNameToGenerate + " = new int[100][300];");
+
+		
 		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
 		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
 		String how, howValue, sendValue;
@@ -1576,10 +1580,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				for (Eventable edge : p.getEdgeList()) {
 					//For each eventable in the path
 					pathCount++;
-					// This is to store which states were observed in this test case
-					
-					
-					writeStatesForTestCasesToFile("public static int [][] " + testSuiteNameToGenerate + " = new int[100][300];");
+
 					writeStatesForTestCasesToFile(testSuiteNameToGenerate + "[" + counter + "][" + Integer.toString(edge.getSourceStateVertex().getId()) + "] = 1;");
 					
 					testMethod.addStatement("//From state " + Integer.toString(edge.getSourceStateVertex().getId()) 
