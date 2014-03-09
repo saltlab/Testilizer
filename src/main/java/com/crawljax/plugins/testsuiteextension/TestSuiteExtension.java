@@ -146,7 +146,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 	// SVM training set
-	ArrayList<ElementFeatures> trainingSetElementFeatures = new ArrayList<ElementFeatures>();
+	ArrayList<ElementFeatures> trainingPositiveSetElementFeatures = new ArrayList<ElementFeatures>();
+	ArrayList<ElementFeatures> trainingNegetiveSetElementFeatures = new ArrayList<ElementFeatures>();
 	boolean manualTestPathsCreated = false;
 
 
@@ -565,7 +566,27 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 						// Generate feature vector of the asserted element with label +1 and add to dataset file to be used for training the SVM
-						addToTrainingSet(getAssertedElemFeatureVector(webElement));
+						//addToTrainingSet(getAssertedElemFeatureVector(webElement));
+
+
+						ElementFeatures ef = getAssertedElemFeatureVector(webElement);
+
+						boolean elementExist = false;
+						for (ElementFeatures currentEF : trainingPositiveSetElementFeatures){
+							if (currentEF.equals(ef)){
+								currentEF.increaseCount();
+								elementExist = true;
+								break;
+							}
+							if (currentEF.cosineSimilarity(ef) > 0.8){
+								elementExist = true;
+								break;
+							}					
+						}
+						if (elementExist == false)
+							trainingPositiveSetElementFeatures.add(ef);
+
+						
 
 					}
 
@@ -914,7 +935,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			out = new ObjectOutputStream(fos);
 			out.writeObject(sfg);
 			out.close();
-			LOG.info("TestSuiteExtension successfully wrote SFG to sfg.ser file");
+			LOG.info("TestSuiteExtension successfully wrote SFG to sfg_init.ser file");
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
@@ -937,7 +958,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			out = new ObjectOutputStream(fos);
 			out.writeObject(sfg);
 			out.close();
-			LOG.info("TestSuiteExtension successfully wrote SFG to sfg.ser file");
+			LOG.info("TestSuiteExtension successfully wrote SFG to sfg_extend.ser file");
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
@@ -1221,14 +1242,20 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		if (!loadInitialSFGFromFile && !loadExtendedSFGFromFile){
 			System.out.println("Training the SVM for assertion prediction...");
 
+			for (int k = 0; k < trainingPositiveSetElementFeatures.size(); k++){
+				//System.out.println(trainingNegetiveSetElementFeatures.get(k));
+				addToTrainingSet(trainingPositiveSetElementFeatures.get(k));
+			}
+
+			
 			// choosing top-k frequent features from the ArrayList to be written in the training set file
-			Collections.sort(trainingSetElementFeatures,new ElementFeatureComp());
-			int maxToSelect = 40;
-			if (maxToSelect > trainingSetElementFeatures.size())
-				maxToSelect = trainingSetElementFeatures.size();
+			Collections.sort(trainingNegetiveSetElementFeatures,new ElementFeatureComp());
+			int maxToSelect = 100;
+			if (maxToSelect > trainingNegetiveSetElementFeatures.size())
+				maxToSelect = trainingNegetiveSetElementFeatures.size();
 			for (int k = 0; k < maxToSelect; k++){
-				//System.out.println(trainingSetElementFeatures.get(k));
-				addToTrainingSet(trainingSetElementFeatures.get(k));
+				//System.out.println(trainingNegetiveSetElementFeatures.get(k));
+				addToTrainingSet(trainingNegetiveSetElementFeatures.get(k));
 			}
 		}
 
@@ -1618,15 +1645,21 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							totalAssertions++;
 						}*/
 						// Adding SP assertion
+
+						HashSet<String> uniqueAssertions = new HashSet<String>();
 						for (ElementFeatures ef: edge.getSourceStateVertex().getElementFeatures()){
-							if (svmPredict(ef)==true)
-								if (ef.getElementPatternAssertion()!=null){
-									String elementPatternAssertion = ef.getElementPatternAssertion();
-									elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
-									testMethod.addStatement(elementPatternAssertion + "; // predicted pattern assertion");
-									predictedAssertions++;
-									totalAssertions++;
-								}
+							if (svmPredict(ef)==true){
+								String elementPatternAssertion = ef.getElementPatternAssertion();
+								elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
+								if (elementPatternAssertion!=null && elementPatternAssertion.length()<4000)
+									uniqueAssertions.add(elementPatternAssertion);
+							}
+						}
+
+						for (String asseertion: uniqueAssertions){
+							testMethod.addStatement(asseertion + "; // predicted pattern assertion");
+							predictedAssertions++;
+							totalAssertions++;
 						}
 
 					}
@@ -1770,15 +1803,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						// Adding learned assertions (SVM predicting for a feature vector)
 						if (addLearnedAssertions){
 							// Adding SP assertion
+							HashSet<String> uniqueAssertions = new HashSet<String>();
 							for (ElementFeatures ef: edge.getTargetStateVertex().getElementFeatures()){
-								if (svmPredict(ef)==true)
-									if (ef.getElementPatternAssertion()!=null){
-										String elementPatternAssertion = ef.getElementPatternAssertion();
-										elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
-										testMethod.addStatement(elementPatternAssertion + "; // predicted pattern assertion");
-										predictedAssertions++;
-										totalAssertions++;
-									}
+								if (svmPredict(ef)==true){
+									String elementPatternAssertion = ef.getElementPatternAssertion();
+									elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
+									if (elementPatternAssertion!=null && elementPatternAssertion.length()<4000)
+										uniqueAssertions.add(elementPatternAssertion);
+								}
+							}
+							for (String asseertion: uniqueAssertions){
+								testMethod.addStatement(asseertion + "; // predicted pattern assertion");
+								predictedAssertions++;
+								totalAssertions++;
 							}
 
 						}
@@ -1949,19 +1986,19 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			// Adding feature vector of block DOM elements with label -1 (from manual test states) to be used for training the SVM.
 			boolean elementExist = false;
 			if (manualTestPathsCreated==false){
-				for (ElementFeatures currentEF : trainingSetElementFeatures){
+				for (ElementFeatures currentEF : trainingNegetiveSetElementFeatures){
 					if (currentEF.equals(ef)){
 						currentEF.increaseCount();
 						elementExist = true;
 						break;
 					}
-					if (currentEF.cosineSimilarity(ef)<0.7){
+					if (currentEF.cosineSimilarity(ef) > 0.9){
 						elementExist = true;
 						break;
 					}					
 				}
 				if (elementExist == false)
-					trainingSetElementFeatures.add(ef);
+					trainingNegetiveSetElementFeatures.add(ef);
 			}
 		}
 
@@ -2070,7 +2107,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						elementExist = true;
 						break;
 					}
-					if (currentEF.cosineSimilarity(ef)<0.9){
+					if (currentEF.cosineSimilarity(ef) > 0.9){
 						elementExist = true;
 						break;
 					}					
