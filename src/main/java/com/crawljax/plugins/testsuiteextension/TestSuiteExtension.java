@@ -53,6 +53,7 @@ import libsvm.svm_parameter;
 import org.jgrapht.GraphPath;
 import org.junit.runner.JUnitCore;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
 
 import org.slf4j.Logger;
@@ -71,6 +72,7 @@ import com.crawljax.core.ExitNotifier.ExitStatus;
 import com.crawljax.core.configuration.CrawljaxConfiguration;
 import com.crawljax.core.plugin.DomChangeNotifierPlugin;
 import com.crawljax.core.plugin.ExecuteInitialPathsPlugin;
+import com.crawljax.core.plugin.OnCloneStateDetectedPlugin;
 import com.crawljax.core.plugin.OnFireEventSucceededPlugin;
 import com.crawljax.core.plugin.OnNewStatePlugin;
 import com.crawljax.core.plugin.OnRevisitStatePlugin;
@@ -105,27 +107,36 @@ import com.google.common.collect.ImmutableList;
  * It initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.
  **/
 public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
-PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomChangeNotifierPlugin{
+PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomChangeNotifierPlugin, OnCloneStateDetectedPlugin{
 
 	/**
 	 * Settings for my experiments
 	 */
 	//String appName = "claroline";
-	String appName = "photogallery";
-	//String appName = "wolfcms";
+	//String appName = "photogallery";
+	String appName = "wolfcms";
 
-	private String testSuiteNameToGenerate = appName + "_EP_learned";
+	private String testSuiteNameToGenerate = appName + "_EP_all";
 
 	// one should only be true! if two are false then creates sfg files
 	static boolean loadInitialSFGFromFile = false;
 	static boolean loadExtendedSFGFromFile = true;
 	
+	
 	static boolean saveNewTrainingDatasetToFile = false;
 
-	static boolean addReusedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addGeneratedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addLearnedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
+	// this is to create a baseline for comparison reasons -> generating random assertions on the page.	static boolean randomAssertionGeneration = false;  
+	static boolean addRandomAssertions = false; // getting code coverage by JSCover tool proxy (default should be false)
+	static int numOfRandomElementAssertion = 0; // should be equal to sum of: original + reused (FullExactElementMatch)
+	static int numOfRandomPatternAssertion = 0; // should be equal to sum of: pattern for original + ExactPAtterns + learned (similar patterns)
+	
+	ArrayList<Element> tempListOfDOMElement = new ArrayList<Element>(); // This is to store all DOM elements in browser state to be added to states in the SFG
+
+	
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
 	// DOM-mutation testing settings
@@ -368,6 +379,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				firstConsumer.getCrawler().reset();
 			}
 
+			if (st.equals("sleep")){
+				System.out.println("wating 500 miliseconds...");
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			
+			
 			else{
 				methodValue = getMethodValue(st);
 
@@ -578,10 +600,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								elementExist = true;
 								break;
 							}
-							if (currentEF.cosineSimilarity(ef) > 0.8){
-								elementExist = true;
-								break;
-							}					
+							//if (currentEF.cosineSimilarity(ef) > 0.5){
+							//	elementExist = true;
+							//	break;
+							//}					
 						}
 						if (elementExist == false)
 							trainingPositiveSetElementFeatures.add(ef);
@@ -590,6 +612,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 					}
 
+					
 					// to distinguish original assertions from reused/generated ones
 					AssertedElementPattern aep = new AssertedElementPattern(assertedSourceElement, assertion, elementLocator);
 					aep.setAssertionOrigin("original assertion");
@@ -892,7 +915,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				try {
 					SourceElement = getElementFromXpath(xpath, browser);
 					AssertedElementPattern aep = new AssertedElementPattern(SourceElement, "", xpath);
-					int numOfChildren = SourceElement.getChildNodes().getLength();
+					int numOfChildren = 0;
+					if (SourceElement!=null)
+						if (SourceElement.getChildNodes()!=null)
+							numOfChildren = SourceElement.getChildNodes().getLength();
 					normalNumOfChildren = (double) numOfChildren / 10.0;
 					if (normalNumOfChildren>1.0)
 						normalNumOfChildren = 1.0;
@@ -1266,10 +1292,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		for (StateVertex s: sfg.getAllStates()){
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
 			//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
-			//if (s.getAssertions().size()>0){
+			//if (s.getAssertions().size()>0)
 			//	for (int i=0;i<s.getAssertions().size();i++)
 			//		System.out.println(s.getAssertions().get(i));
-			//}
 
 
 			for (AssertedElementPattern	aep: originalAssertedElementPatterns){
@@ -1341,10 +1366,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			}
 
 			//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " after generation.");
-			//if (s.getAssertions().size()>0){
+			//if (s.getAssertions().size()>0)
 			//	for (int i=0;i<s.getAssertions().size();i++)
 			//		System.out.println(s.getAssertions().get(i));
-			//}
 
 
 			// **************TODO: suppressing redundant assertions ***********
@@ -1619,6 +1643,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 					// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
 					testMethod.addStatement("mutateDOMTree(" + edge.getSourceStateVertex().getId() + ");");
+
 
 
 					// Adding original assertion to the method
@@ -1955,11 +1980,66 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void onFireEvent(CrawlerContext context, StateVertex stateBefore, Eventable eventable, StateVertex stateAfter) {
 
-		if (true)
-			return;
+		// New idea for storing all elements so that later can be used for random assertion generation method
+		// Note that "stateAfter" is not added yet to the SFG and might be a clone state.
+		
+		String jscript = "function getElementXPath(elt) " +   
+				"{" + 
+				"var path = \"\";" +
+				"for (; elt && elt.nodeType == 1; elt = elt.parentNode)" + 
+				"{" +        
+				"idx = getElementIdx(elt);" + 
+				"xname = elt.tagName;" +
+				"if (idx > 1) xname += \"[\" + idx + \"]\";" + 
+				"path = \"/\" + xname + path;" + 
+				"}" +  
+				"return path;" + 
+				"} " + 
 
+				"function getElementIdx(elt) "+ 
+				"{"  + 
+				"var count = 1;" + 
+				"for (var sib = elt.previousSibling; sib ; sib = sib.previousSibling) " + 
+				"{" + 
+				"if(sib.nodeType == 1 && sib.tagName == elt.tagName) count++; " + 
+				"} " +     
+				"return count;" + 
+				"} " +
+
+				"var all = document.getElementsByTagName(\"*\");" +
+				"var allXPaths = = new Array();" +
+				"for (var i=0, max=all.length; i < max; i++) {" +
+				"allXPaths[i] = getElementXPath(all[i]);" +
+				"}" +
+
+				"return allXPaths;";
+		
+		Object xpathObjs = this.browser.executeJavaScript(jscript);
+
+		ArrayList xPaths = (ArrayList) xpathObjs;
+
+		try {
+			String xpath = "";
+			for (int i=0;i<xPaths.size();i++){
+				xpath  = (xPaths.get(i).toString());
+				Element element = getElementFromXpath(xpath, browser);
+				System.out.println("The DOM element is: " + element);
+				tempListOfDOMElement.add(element);
+			}
+		} catch (XPathExpressionException e) {
+			System.out.println("XPathExpressionException!");
+			e.printStackTrace();
+		}
+		
+		// now add the tempListOfDOMElement to the current DOM state in the SFG
+
+
+
+		/*
+		 * This was previously added for FeedEx part but replaced with the new exploration idea
+		 */
 		// Calculating JS statement code coverage for feedback-directed exploration
-		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
+		/*for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
 			//System.out.println("MODIFIED CODES ARE: " + modifiedJS);
 			try{
 				Object counter =  this.browser.executeJavaScript("return " + modifiedJS + "_exec_counter;");
@@ -1970,18 +2050,36 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 		double coverage = getCoverage();;
 		context.getSession().getStateFlowGraph().setLatestCoverage(coverage);
-
 		//LOG.info(Serializer.toPrettyJson(AstInstrumenter.jsFunctions));
+		*/
 	}
 
 	@Override
-	public void onNewState(CrawlerContext context, StateVertex vertex) {
-
+	public void onCloneState(CrawlerContext context, StateVertex cloneState) {
+		// Adding DOM elements observed in the browser to the clone state
+		for (Element element: tempListOfDOMElement)
+			cloneState.addDOMElements(element);
+		// Emptying the tempListOfDOMElement
+		tempListOfDOMElement.clear();
+		
+	}
+	
+	@Override
+	public void onNewState(CrawlerContext context, StateVertex newState) {
+		// Adding DOM elements observed in the browser to the new state
+		for (Element element: tempListOfDOMElement)
+			newState.addDOMElements(element);
+		// Emptying the tempListOfDOMElement
+		tempListOfDOMElement.clear();
+		
+		
+		
+		
 		// Getting feature vector of block DOM elements [label=-1 (if manualTestPath is not creatred) and 0 otherwise], to be predicted by the trained SVM.
 		ArrayList<ElementFeatures> newElementsFeatures = getDOMElementsFeatures();
 		// Adding feature vectors to the state
 		for (ElementFeatures ef: newElementsFeatures){
-			vertex.addElementFeatures(ef);
+			newState.addElementFeatures(ef);
 
 			// Adding feature vector of block DOM elements with label -1 (from manual test states) to be used for training the SVM.
 			boolean elementExist = false;
@@ -1992,10 +2090,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						elementExist = true;
 						break;
 					}
-					if (currentEF.cosineSimilarity(ef) > 0.9){
-						elementExist = true;
-						break;
-					}					
+					//if (currentEF.cosineSimilarity(ef) > 0.5){
+					//	elementExist = true;
+					//	break;
+					//}					
 				}
 				if (elementExist == false)
 					trainingNegetiveSetElementFeatures.add(ef);
@@ -2003,10 +2101,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 
-		// FeedEx is no more used for exploration
-		if (true)
-			return;
 
+		/*
+		 * This was previously added for FeedEx part but replaced with the new exploration idea
+		 */
+		/*
 		// bypass or select random if error occured or coverage impact is negative
 
 		// Calculate initial code coverage for the index page to be used by Feedex
@@ -2015,8 +2114,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				// LOGGER.info("** MODIFIEDS ARE: " + modifiedJS);
 				try{
 					Object counter =  this.browser.executeJavaScript("return " + modifiedJS + "_exec_counter;");
-					ArrayList countList = (ArrayList) counter;
-
 					setCountList(modifiedJS, counter);
 				}catch (Exception e) {
 					LOG.info("Could not execute script: return " + modifiedJS + "_exec_counter;");
@@ -2025,6 +2122,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			double coverage = getCoverage();
 			context.getSession().getStateFlowGraph().setInitialCoverage(vertex, coverage);
 		}
+		*/
 
 	}
 
@@ -2262,5 +2360,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				System.out.println(SelectedRandomElementInDOM[i][j]);
 		
 	}
+
+
 
 }
