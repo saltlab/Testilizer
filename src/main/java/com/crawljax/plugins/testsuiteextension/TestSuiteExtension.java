@@ -113,17 +113,17 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 * Settings for my experiments
 	 */
 	//String appName = "claroline";
-	//String appName = "photogallery";
-	String appName = "wolfcms";
+	String appName = "photogallery";
+	//String appName = "wolfcms";
 
 	private String testSuiteNameToGenerate = appName + "_EP_all";
 
 	// one should only be true! if two are false then creates sfg files
 	static boolean loadInitialSFGFromFile = false;
-	static boolean loadExtendedSFGFromFile = true;
+	static boolean loadExtendedSFGFromFile = false;
 	
 	
-	static boolean saveNewTrainingDatasetToFile = false;
+	static boolean saveNewTrainingDatasetToFile = true;
 
 	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
@@ -134,8 +134,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	static int numOfRandomElementAssertion = 0; // should be equal to sum of: original + reused (FullExactElementMatch)
 	static int numOfRandomPatternAssertion = 0; // should be equal to sum of: pattern for original + ExactPAtterns + learned (similar patterns)
 	
-	ArrayList<Element> tempListOfDOMElement = new ArrayList<Element>(); // This is to store all DOM elements in browser state to be added to states in the SFG
+	// These are to store assertions for all DOM elements in browser state to be added to states in the SFG
+	ArrayList<String> tempListOfelementTagAttAssertions  = new ArrayList<String>(); 
+	ArrayList<String> tempListOfpatternTagAssertions  = new ArrayList<String>(); 
+	ArrayList<String> tempListOfpatternSimilarAssertions  = new ArrayList<String>(); 
+	ArrayList<String> tempListOfpatternFullAssertions  = new ArrayList<String>(); 
 
+	
 	
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
@@ -1290,6 +1295,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		// DOM-based assertion generation part
 		for (StateVertex s: sfg.getAllStates()){
+			
+			System.out.println("Abstract state " + s.getName() + " has " + s.getElementTagAttAssertions().size() + " ElementTagAttAssertions for non-abstract DOM elements.");
+			System.out.println("Abstract state " + s.getName() + " has " + s.getPatternTagAssertions().size() + " PatternTagAssertions for non-abstract DOM elements.");
+			System.out.println("Abstract state " + s.getName() + " has " + s.getPatternSimilarAssertions().size() + " PatternSimilarAssertions for non-abstract DOM elements.");
+			System.out.println("Abstract state " + s.getName() + " has " + s.getPatternFullAssertions().size() + " PatternFullAssertions for non-abstract DOM elements.");
+			
+			
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
 			//System.out.println("There are " + s.getAssertions().size() + " asserted element patterns in state " + s.getName() + " before generation.");
 			//if (s.getAssertions().size()>0)
@@ -1582,16 +1594,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		// generating an AssertedElementPattern based on the matching result
 		AssertedElementPattern newaep = new AssertedElementPattern(aep.getSourceElement(), "", aep.getAssertedElementLocator()); // creating an AssertedElementPattern without any assertion text
 
+		if (newaep.getTagName().toUpperCase().equals("BODY"))
+			return null;
+		
 		switch (howMatched){
 		case "ElementTagAttMatch":
-			if (newaep.getAssertedElementLocator().toUpperCase().contains("BODY"))
-				return null;
 			newaep.setAssertion("assertTrue(isElementPresent("+ newaep.getAssertedElementLocator() +"))");
 			//System.out.println(newaep);
 			break;
 		case "ElementTagMatch":
-			if (newaep.getTagName().toUpperCase().equals("BODY"))
-				return null;			
 			newaep.setAssertion("assertTrue(isElementPresent(By.tagName(\"" + newaep.getTagName() +"\")))");
 			//System.out.println(newaep);
 			break;
@@ -1983,7 +1994,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		// New idea for storing all elements so that later can be used for random assertion generation method
 		// Note that "stateAfter" is not added yet to the SFG and might be a clone state.
 		
-		String jscript = "function getElementXPath(elt) " +   
+		//This code was browser-memory-inefficient and replaced with a slower but more memory-efficient one
+		/*String jscript = "function getElementXPath(elt) " +   
 				"{" + 
 				"var path = \"\";" +
 				"for (; elt && elt.nodeType == 1; elt = elt.parentNode)" + 
@@ -2007,29 +2019,71 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				"} " +
 
 				"var all = document.getElementsByTagName(\"*\");" +
-				"var allXPaths = = new Array();" +
+				"var allXPaths = new Array();" +
 				"for (var i=0, max=all.length; i < max; i++) {" +
 				"allXPaths[i] = getElementXPath(all[i]);" +
 				"}" +
 
 				"return allXPaths;";
+		*/
+
 		
-		Object xpathObjs = this.browser.executeJavaScript(jscript);
-
-		ArrayList xPaths = (ArrayList) xpathObjs;
-
 		try {
+
+			Object webelementObjs = this.browser.executeJavaScript("return document.getElementsByTagName(\"*\");");
+			ArrayList webelements = (ArrayList) webelementObjs;
+			WebElement webelement = null;
+			for (int i=0;i<webelements.size();i++){
+				webelement  = (WebElement) webelements.get(i);
+				String xpath = getXPath(webelement);
+				Element element = getElementFromXpath(xpath, browser);
+				if (element.getTagName().toUpperCase().equals("HTML") || 
+						element.getTagName().toUpperCase().equals("HEAD") ||
+						element.getTagName().toUpperCase().equals("META") ||
+						element.getTagName().toUpperCase().equals("BODY"))
+					continue;
+				//System.out.println("The DOM element is: " + element);
+				
+				AssertedElementPattern aep = new AssertedElementPattern(element, "", "\"" + xpath + "\""); // creating an AssertedElementPattern without any assertion text
+				// generate element/pattern assertions in the form of strings for each DOM element
+				String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
+				String patternTagAssertion =  generatePatternAssertion(aep, "PatternTagMatch").getAssertion();
+				String patternSimilarAssertion =  generatePatternAssertion(aep, "SimilarAssertion").getAssertion();
+				String patternFullAssertion =  generatePatternAssertion(aep, "PatternFullMatch").getAssertion();
+				
+				tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
+				tempListOfpatternTagAssertions.add(patternTagAssertion); 
+				tempListOfpatternSimilarAssertions.add(patternSimilarAssertion);
+				tempListOfpatternFullAssertions.add(patternFullAssertion);
+				
+			}
+
+
+
+			/*Object xpathObjs = this.browser.executeJavaScript(jscript);
+			ArrayList xPaths = (ArrayList) xpathObjs;
 			String xpath = "";
 			for (int i=0;i<xPaths.size();i++){
 				xpath  = (xPaths.get(i).toString());
 				Element element = getElementFromXpath(xpath, browser);
-				System.out.println("The DOM element is: " + element);
+				if (element.getTagName().toUpperCase().equals("HTML") || 
+						element.getTagName().toUpperCase().equals("HEAD") ||
+						element.getTagName().toUpperCase().equals("META") ||
+						element.getTagName().toUpperCase().equals("BODY"))
+					continue;
+				//System.out.println("The DOM element is: " + element);
 				tempListOfDOMElement.add(element);
 			}
-		} catch (XPathExpressionException e) {
-			System.out.println("XPathExpressionException!");
+			*/
+			
+		} catch (XPathExpressionException xe) {
+			LOG.info("XPathExpressionException!");
+			xe.printStackTrace();
+		} catch(Exception e){
+			LOG.info("Could not execute script");
 			e.printStackTrace();
 		}
+		
 		
 		// now add the tempListOfDOMElement to the current DOM state in the SFG
 
@@ -2057,20 +2111,45 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	@Override
 	public void onCloneState(CrawlerContext context, StateVertex cloneState) {
 		// Adding DOM elements observed in the browser to the clone state
-		for (Element element: tempListOfDOMElement)
-			cloneState.addDOMElements(element);
-		// Emptying the tempListOfDOMElement
-		tempListOfDOMElement.clear();
-		
+		for (String assertion: tempListOfelementTagAttAssertions)
+			cloneState.addElementTagAttAssertion(assertion);
+		for (String assertion: tempListOfpatternTagAssertions)
+			cloneState.addPatternTagAssertion(assertion);
+		for (String assertion: tempListOfpatternSimilarAssertions)
+			cloneState.addPatternSimilarAssertion(assertion);
+		for (String assertion: tempListOfpatternFullAssertions)
+			cloneState.addPatternFullAssertion(assertion);
+
+		// Emptying the temp lists
+		tempListOfelementTagAttAssertions.clear();
+		tempListOfpatternTagAssertions.clear();
+		tempListOfpatternSimilarAssertions.clear();
+		tempListOfpatternFullAssertions.clear();	
 	}
 	
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex newState) {
+		
+		if (newState.getId()==0){
+			browser = context.getBrowser();
+			onFireEvent(context, null, null, newState);
+		}
+		
 		// Adding DOM elements observed in the browser to the new state
-		for (Element element: tempListOfDOMElement)
-			newState.addDOMElements(element);
-		// Emptying the tempListOfDOMElement
-		tempListOfDOMElement.clear();
+		for (String assertion: tempListOfelementTagAttAssertions)
+			newState.addElementTagAttAssertion(assertion);
+		for (String assertion: tempListOfpatternTagAssertions)
+			newState.addPatternTagAssertion(assertion);
+		for (String assertion: tempListOfpatternSimilarAssertions)
+			newState.addPatternSimilarAssertion(assertion);
+		for (String assertion: tempListOfpatternFullAssertions)
+			newState.addPatternFullAssertion(assertion);
+
+		// Emptying the temp lists
+		tempListOfelementTagAttAssertions.clear();
+		tempListOfpatternTagAssertions.clear();
+		tempListOfpatternSimilarAssertions.clear();
+		tempListOfpatternFullAssertions.clear();	
 		
 		
 		
