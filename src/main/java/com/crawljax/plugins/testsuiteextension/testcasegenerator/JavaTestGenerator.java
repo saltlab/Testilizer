@@ -33,7 +33,7 @@ public class JavaTestGenerator {
 	 * @param testMethods 
 	 * @throws Exception
 	 */
-	public JavaTestGenerator(String packagename, String className, String url, ArrayList<TestMethod> testMethods) throws Exception {
+	public JavaTestGenerator(String packagename, String className, String url, ArrayList<TestMethod> testMethods, ArrayList<TestMethod> checkMethods) throws Exception {
 
 	//public JavaTestGenerator(String className, String url, List<TestMethod> testMethods,
 	//      CrawljaxConfiguration configuration) throws Exception {
@@ -53,6 +53,7 @@ public class JavaTestGenerator {
 		context.put("classname", className);
 		context.put("url", url);
 		context.put("testMethods", testMethods);
+		context.put("checkMethods", checkMethods);
 
 		//context.put("waitAfterEvent", crawlRules.getWaitAfterEvent());
 		//context.put("waitAfterReloadUrl", crawlRules.getWaitAfterReloadUrl());

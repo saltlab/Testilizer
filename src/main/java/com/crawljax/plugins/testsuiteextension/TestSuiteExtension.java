@@ -116,31 +116,29 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	String appName = "photogallery";
 	//String appName = "wolfcms";
 
-	private String testSuiteNameToGenerate = appName + "_EP_all";
+	private String testSuiteNameToGenerate = appName + "_EP_rand1";
 
 	// one should only be true! if two are false then creates sfg files
 	static boolean loadInitialSFGFromFile = false;
-	static boolean loadExtendedSFGFromFile = false;
+	static boolean loadExtendedSFGFromFile = true;
 	
-	
-	static boolean saveNewTrainingDatasetToFile = true;
+	static boolean saveNewTrainingDatasetToFile = false;
 
 	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 	static boolean addLearnedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	// this is to create a baseline for comparison reasons -> generating random assertions on the page.	static boolean randomAssertionGeneration = false;  
-	static boolean addRandomAssertions = false; // getting code coverage by JSCover tool proxy (default should be false)
-	static int numOfRandomElementAssertion = 0; // should be equal to sum of: original + reused (FullExactElementMatch)
-	static int numOfRandomPatternAssertion = 0; // should be equal to sum of: pattern for original + ExactPAtterns + learned (similar patterns)
-	
+	static boolean addRandomAssertions = true; // getting code coverage by JSCover tool proxy (default should be false)
 	// These are to store assertions for all DOM elements in browser state to be added to states in the SFG
 	ArrayList<String> tempListOfelementTagAttAssertions  = new ArrayList<String>(); 
+	ArrayList<String> tempListOfelementFullAssertions  = new ArrayList<String>(); 
 	ArrayList<String> tempListOfpatternTagAssertions  = new ArrayList<String>(); 
-	ArrayList<String> tempListOfpatternSimilarAssertions  = new ArrayList<String>(); 
 	ArrayList<String> tempListOfpatternFullAssertions  = new ArrayList<String>(); 
+	int randElementTagAttAssertions = 0;
+	int randPatternTagAssertions = 0;
+	int randPatternFullAssertions = 0;
 
-	
 	
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
@@ -1296,10 +1294,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		// DOM-based assertion generation part
 		for (StateVertex s: sfg.getAllStates()){
 			
-			System.out.println("Abstract state " + s.getName() + " has " + s.getElementTagAttAssertions().size() + " ElementTagAttAssertions for non-abstract DOM elements.");
-			System.out.println("Abstract state " + s.getName() + " has " + s.getPatternTagAssertions().size() + " PatternTagAssertions for non-abstract DOM elements.");
-			System.out.println("Abstract state " + s.getName() + " has " + s.getPatternSimilarAssertions().size() + " PatternSimilarAssertions for non-abstract DOM elements.");
-			System.out.println("Abstract state " + s.getName() + " has " + s.getPatternFullAssertions().size() + " PatternFullAssertions for non-abstract DOM elements.");
+			//System.out.println("Abstract state " + s.getName() + " has " + s.getElementTagAttAssertions().size() + " ElementTagAttAssertions for non-abstract DOM elements.");
+			//System.out.println("Abstract state " + s.getName() + " has " + s.getPatternTagAssertions().size() + " PatternTagAssertions for non-abstract DOM elements.");
+			//System.out.println("Abstract state " + s.getName() + " has " + s.getPatternSimilarAssertions().size() + " PatternSimilarAssertions for non-abstract DOM elements.");
+			//System.out.println("Abstract state " + s.getName() + " has " + s.getPatternFullAssertions().size() + " PatternFullAssertions for non-abstract DOM elements.");
 			
 			
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
@@ -1554,7 +1552,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}else
 			patternCheckAssertion += "\")));\n";
 
-		patternCheckAssertion += "\t\t\tparentElement = new DOMElement(\"" + parentTag + "\", \"" + parentText.replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
+		patternCheckAssertion += "\t\tparentElement = new DOMElement(\"" + parentTag + "\", \"" + parentText.replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
 		if (parentAttributes.size()>0){ // avoiding null
 			for (int j=0; j < parentAttributes.size()-1; j++)
 				patternCheckAssertion += parentAttributes.get(j).replace("\"", "\\\"") + "\",\"";
@@ -1562,10 +1560,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}else
 			patternCheckAssertion += "\")));\n";
 
-		patternCheckAssertion += "\t\t\tchildrenElements.clear();\n";
+		patternCheckAssertion += "\t\tchildrenElements.clear();\n";
 		for (int k=0; k<childrenTags.size(); k++){
-			//patternCheckAssertion += "\t\t\tchildrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"" + childrenTexts.get(k).replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
-			patternCheckAssertion += "\t\t\tchildrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"\", new ArrayList<String>(Arrays.asList(\"";
+			//patternCheckAssertion += "childrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"" + childrenTexts.get(k).replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
+			patternCheckAssertion += "\t\tchildrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"\", new ArrayList<String>(Arrays.asList(\"";
 			if (k < childrenAttributes.size() && childrenAttributes.get(k).size()>0){ // check if attributes are less than tags due to being null
 				for (int j=0; j < childrenAttributes.get(k).size()-1; j++)
 					patternCheckAssertion += childrenAttributes.get(k).get(j).replace("\"", "\\\"") + "\",\"";
@@ -1575,9 +1573,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		}
 
 		if (howMatched.equals("PatternTagMatch") || howMatched.equals("SimilarAssertion"))
-			patternCheckAssertion += "\t\t\tassertTrue(isElementPatternTagPresent(parentElement , element, childrenElements))";
+			patternCheckAssertion += "\t\tassertTrue(isElementPatternTagPresent(parentElement , element, childrenElements))";
 		else
-			patternCheckAssertion += "\t\t\tassertTrue(isElementPatternFullPresent(parentElement , element, childrenElements))";
+			patternCheckAssertion += "\t\tassertTrue(isElementPatternFullPresent(parentElement , element, childrenElements))";
 
 
 		AssertedElementPattern aepMatch = new AssertedElementPattern(aep.getSourceElement(), patternCheckAssertion, aep.getAssertedElementLocator());
@@ -1615,7 +1613,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	/**
 	 * Generating the extended test suite in multiple files
-	 * @param session
 	 */
 	private void generateTestSuite(StateFlowGraph sfg) {
 
@@ -1625,11 +1622,74 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		
 		List<List<GraphPath<StateVertex, Eventable>>> results = sfg.getAllPossiblePaths(sfg.getInitialState());
 		ArrayList<TestMethod> testMethods = new ArrayList<TestMethod>();
+		ArrayList<TestMethod> checkMethods = new ArrayList<TestMethod>(); // these methods checks the assertions for each state
 		String how, howValue, sendValue;
 
 		int counter = 0, totalAssertions = 0, predictedAssertions = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
 				ElementFullMatch = 0, ElementTagAttMatch = 0, PatternFullMatch = 0, PatternTagAttMatch = 0, PatternTagMatch = 0, AEPforOriginalAssertions=0;
+		
+		int randElementTagAttAssertionsOnStates = 0, randPatternTagAssertionsOnStates =0, randPatternFullAssertionsOnStates = 0;
 
+		int numberOfStatesInTestSuite = 0;
+		
+		// applying randomized assertion generation
+		if (addRandomAssertions==true){
+			for (StateVertex state: sfg.getAllStates()){
+				
+				if (state.getId() == 0){
+					System.out.println(state.getElementTagAttAssertions());
+					System.out.println(state.getPatternTagAssertions());
+					System.out.println(state.getPatternFullAssertions());
+				}
+					
+				List<String> elementTagAttAssertions = new ArrayList<String>(state.getElementTagAttAssertions());
+				Collections.shuffle(elementTagAttAssertions);
+				List<String> patternTagAssertions = new ArrayList<String>(state.getPatternTagAssertions());
+				Collections.shuffle(patternTagAssertions);
+				List<String> patternFullAssertions = new ArrayList<String>(state.getPatternFullAssertions());
+				Collections.shuffle(patternFullAssertions);
+
+				int numberOfElementTagAttAssertionsToSelect = 0;
+				int numberOfPatternTagAssertionsToSelect = 0;
+				int numberOfPatternFullAssertionsToSelect = 0;
+
+				
+				if (elementTagAttAssertions.size()>0)
+					numberOfElementTagAttAssertionsToSelect = new Random().nextInt(elementTagAttAssertions.size());
+				if (patternTagAssertions.size()>0)
+					numberOfPatternTagAssertionsToSelect = new Random().nextInt(patternTagAssertions.size());
+				if (patternFullAssertions.size()>0)
+					numberOfPatternFullAssertionsToSelect = new Random().nextInt(patternFullAssertions.size());
+
+				// for the sake of readability and test case compilation
+				if (numberOfElementTagAttAssertionsToSelect>30)
+					numberOfElementTagAttAssertionsToSelect=30;
+				if (numberOfPatternTagAssertionsToSelect>30)
+					numberOfPatternTagAssertionsToSelect=30;
+				if (numberOfPatternFullAssertionsToSelect>30)
+					numberOfPatternFullAssertionsToSelect=30;
+				
+				
+				state.clearElementTagAttAssertions();
+				state.clearPatternTagAssertions();
+				state.clearPatternFullAssertions();
+				for (int i=0;i<numberOfElementTagAttAssertionsToSelect;i++){
+					state.addElementTagAttAssertion(elementTagAttAssertions.get(i));
+					randElementTagAttAssertionsOnStates++;
+				}				
+				for (int i=0;i<numberOfPatternTagAssertionsToSelect;i++){
+					state.addPatternTagAssertion(patternTagAssertions.get(i));
+					randPatternTagAssertionsOnStates++;
+				}
+				for (int i=0;i<numberOfPatternFullAssertionsToSelect;i++){
+					state.addPatternFullAssertion(patternFullAssertions.get(i));
+					randPatternFullAssertionsOnStates++;
+				}				
+			}
+		}	
+
+		
+		
 		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
 			//For each new sink node
 
@@ -1652,103 +1712,112 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					//System.out.println("//From state " + edge.getSourceStateVertex().getId() + " to state " + edge.getTargetStateVertex().getId());
 					//System.out.println("//" + edge.toString());
 
+					numberOfStatesInTestSuite++;
+					
 					// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
 					testMethod.addStatement("mutateDOMTree(" + edge.getSourceStateVertex().getId() + ");");
 
+					testMethod.addStatement("checkState" + edge.getSourceStateVertex().getId() + "();");
+					TestMethod checkMethod = new TestMethod("checkState" + edge.getSourceStateVertex().getId());
 
 
-					// Adding original assertion to the method
-					if (edge.getSourceStateVertex().getAssertions().size()>0){
-						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementPatters().size();i++){
-							String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
-							String assertionOringin = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
-							if (assertionOringin.contains("original assertion")){
-								testMethod.addStatement(assertion + "; // " + assertionOringin);
-								origAndReusedAssertions++;
+					// adding random assertions
+					if (addRandomAssertions==true){
+						for (String assertion : edge.getSourceStateVertex().getElementTagAttAssertions()){
+							checkMethod.addStatement(assertion + "; // Random element assertion");
+							randElementTagAttAssertions++;
+						}
+						for (String assertion : edge.getSourceStateVertex().getPatternTagAssertions()){ //    
+							checkMethod.addStatement(assertion + "; // Random pattern assertion");
+							randPatternTagAssertions++;
+						}
+						for (String assertion : edge.getSourceStateVertex().getPatternFullAssertions()){
+							checkMethod.addStatement(assertion + "; // Random pattern assertion");
+							randPatternFullAssertions++;
+						}
+					}else{
+						// Adding original assertion to the method
+						if (edge.getSourceStateVertex().getAssertions().size()>0){
+							for (int i=0;i<edge.getSourceStateVertex().getAssertedElementPatters().size();i++){
+								String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
+								String assertionOringin = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+								if (assertionOringin.contains("original assertion")){
+									checkMethod.addStatement(assertion + "; // " + assertionOringin+"\n");
+									origAndReusedAssertions++;
+									totalAssertions++;
+								}
+							}
+
+						}
+						// Adding learned assertions (SVM predicting for a feature vector)
+						if (addLearnedAssertions){
+							// Adding SP assertion
+							HashSet<String> uniqueAssertions = new HashSet<String>();
+							for (ElementFeatures ef: edge.getSourceStateVertex().getElementFeatures()){
+								if (svmPredict(ef)==true){
+									String elementPatternAssertion = ef.getElementPatternAssertion();
+									elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
+									if (elementPatternAssertion!=null && elementPatternAssertion.length()<4000)
+										uniqueAssertions.add(elementPatternAssertion);
+								}
+							}
+							for (String asseertion: uniqueAssertions){
+								checkMethod.addStatement(asseertion + "; // predicted pattern assertion\n");
+								predictedAssertions++;
 								totalAssertions++;
 							}
 						}
+						// Adding reused/generated assertions
+						if (edge.getSourceStateVertex().getAssertions().size()>0){
+							for (int i=0;i<edge.getSourceStateVertex().getAssertedElementPatters().size();i++){
+								String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
+								String assertionOringin = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
 
-					}
+								// problem with Claroline app
+								if (edge.getSourceStateVertex().getId()==0 && assertion.equals("assertTrue(isElementPresent(By.linkText(\"Logout\")))"))
+									continue;
 
-					// Adding learned assertions (SVM predicting for a feature vector)
-					if (addLearnedAssertions){
-						// Adding SE assertion
-						/*ArrayList<String> xpathList = svmPredict(edge.getSourceStateVertex());
-						for (String xpath: xpathList){
-							testMethod.addStatement("assertTrue(isElementPresent(By.xpath(\"" + xpath +"\"))); // predicted assertion");
-							predictedAssertions++;
-							totalAssertions++;
-						}*/
-						// Adding SP assertion
-
-						HashSet<String> uniqueAssertions = new HashSet<String>();
-						for (ElementFeatures ef: edge.getSourceStateVertex().getElementFeatures()){
-							if (svmPredict(ef)==true){
-								String elementPatternAssertion = ef.getElementPatternAssertion();
-								elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
-								if (elementPatternAssertion!=null && elementPatternAssertion.length()<4000)
-									uniqueAssertions.add(elementPatternAssertion);
-							}
-						}
-
-						for (String asseertion: uniqueAssertions){
-							testMethod.addStatement(asseertion + "; // predicted pattern assertion");
-							predictedAssertions++;
-							totalAssertions++;
-						}
-
-					}
-
-
-					// Adding assertions
-					if (edge.getSourceStateVertex().getAssertions().size()>0){
-
-
-						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementPatters().size();i++){
-							String assertion = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertion();
-							String assertionOringin = edge.getSourceStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
-
-							// problem with Claroline app
-							if (edge.getSourceStateVertex().getId()==0 && assertion.equals("assertTrue(isElementPresent(By.linkText(\"Logout\")))"))
-								continue;
-
-							// Adding reused assertion to the method
-							if (addReusedAssertions){
-								if (assertionOringin.contains("reused assertion")){
-									testMethod.addStatement(assertion + "; // " + assertionOringin);
-									reusedAssertions++;
-									ElementFullMatch++;
-									totalAssertions++;
+								// Adding reused assertion to the method
+								if (addReusedAssertions){
+									if (assertionOringin.contains("reused assertion")){
+										checkMethod.addStatement(assertion + "; // " + assertionOringin);
+										reusedAssertions++;
+										ElementFullMatch++;
+										totalAssertions++;
+									}
+								}
+								// Adding generated assertion to the method
+								if (addGeneratedAssertions){
+									if (assertionOringin.contains("generated assertion")){
+										//testMethod.addStatement("\n");
+										checkMethod.addStatement(assertion + "; // " + assertionOringin+"\n");
+										generatedAssertions++;
+										totalAssertions++;
+										if (assertionOringin.contains("ElementTagAttMatch")){
+											ElementTagAttMatch++;
+										}
+										//if (assertionOringin.contains("ElementTagMatch"))
+										//	ElementTagMatch++;
+										if (assertionOringin.contains("PatternFullMatch")){
+											PatternFullMatch++;
+										}
+										if (assertionOringin.contains("PatternTagAttMatch")){
+											PatternTagAttMatch++;
+										}
+										if (assertionOringin.contains("PatternTagMatch")){
+											PatternTagMatch++;
+										}
+										if (assertionOringin.contains("AEP for Original")){
+											AEPforOriginalAssertions++;	
+										}
+									}
 								}
 							}
-
-							// Adding generated assertion to the method
-							if (addGeneratedAssertions){
-								if (assertionOringin.contains("generated assertion")){
-									//testMethod.addStatement("\n");
-									testMethod.addStatement(assertion + "; // " + assertionOringin+"\n");
-									generatedAssertions++;
-									totalAssertions++;
-									if (assertionOringin.contains("ElementTagAttMatch"))
-										ElementTagAttMatch++;
-									//if (assertionOringin.contains("ElementTagMatch"))
-									//	ElementTagMatch++;
-									if (assertionOringin.contains("PatternFullMatch"))
-										PatternFullMatch++;
-									if (assertionOringin.contains("PatternTagAttMatch"))
-										PatternTagAttMatch++;
-									if (assertionOringin.contains("PatternTagMatch"))
-										PatternTagMatch++;
-									if (assertionOringin.contains("AEP for Original"))
-										AEPforOriginalAssertions++;									
-								}
-							}
-
 						}
 					}
 
-
+					
+					
 					// applying the click
 					if (edge.getRelatedFormInputs().size() > 0){
 						// First fill the inputs 
@@ -1809,7 +1878,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					testMethod.addStatement("driver.findElement(By." + how + "(\"" + howValue + "\")).click();");
 					
 					
-									
+					// adding the check state method to the file
+					checkMethods.add(checkMethod);
+								
 					/*
 					 * Now for the sink nodes, add mutations and assertions:
 					 */
@@ -1817,92 +1888,106 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						testMethod.addStatement("//Sink node at state " + Integer.toString(edge.getTargetStateVertex().getId()));
 
 						writeStatesForTestCasesToFile(testSuiteNameToGenerate + "[" + counter + "][" + Integer.toString(edge.getTargetStateVertex().getId()) + "] = 1;");
-										
+						
+						numberOfStatesInTestSuite++;
+						
 						// adding DOM-mutator to be used for mutation testing of generated assertions, it stores DOM states before mutating it
 						testMethod.addStatement("mutateDOMTree(" + edge.getTargetStateVertex().getId() + ");");
 
+						testMethod.addStatement("checkState" + edge.getTargetStateVertex().getId() + "();");
+						checkMethod = new TestMethod("checkState" + edge.getTargetStateVertex().getId());
 
-						// Adding original assertion to the method
-						if (edge.getTargetStateVertex().getAssertions().size()>0){
-							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
-								String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
-								String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
-								if (assertionOringin.contains("original assertion")){
-									testMethod.addStatement(assertion + "; // " + assertionOringin);
-									origAndReusedAssertions++;
+						// adding random assertions
+						if (addRandomAssertions==true){
+							for (String assertion : edge.getTargetStateVertex().getElementTagAttAssertions()){
+								checkMethod.addStatement(assertion + "; // Random element assertion");
+								randElementTagAttAssertions++;
+							}
+							for (String assertion : edge.getTargetStateVertex().getPatternTagAssertions()){ //    
+								checkMethod.addStatement(assertion + "; // Random pattern assertion");
+								randPatternTagAssertions++;
+							}
+							for (String assertion : edge.getTargetStateVertex().getPatternFullAssertions()){
+								checkMethod.addStatement(assertion + "; // Random pattern assertion");
+								randPatternFullAssertions++;
+							}
+						}else{
+							// Adding original assertion to the method
+							if (edge.getTargetStateVertex().getAssertions().size()>0){
+								for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
+									String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
+									String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+									if (assertionOringin.contains("original assertion")){
+										checkMethod.addStatement(assertion + "; // " + assertionOringin+"\n");
+										origAndReusedAssertions++;
+										totalAssertions++;
+									}
+								}
+							}
+							// Adding learned assertions (SVM predicting for a feature vector)
+							if (addLearnedAssertions){
+								// Adding SP assertion
+								HashSet<String> uniqueAssertions = new HashSet<String>();
+								for (ElementFeatures ef: edge.getTargetStateVertex().getElementFeatures()){
+									if (svmPredict(ef)==true){
+										String elementPatternAssertion = ef.getElementPatternAssertion();
+										elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
+										if (elementPatternAssertion!=null && elementPatternAssertion.length()<4000)
+											uniqueAssertions.add(elementPatternAssertion);
+									}
+								}
+								for (String asseertion: uniqueAssertions){
+									checkMethod.addStatement(asseertion + "; // predicted pattern assertion\n");
+									predictedAssertions++;
 									totalAssertions++;
 								}
 							}
-
-						}
-
-						// Adding learned assertions (SVM predicting for a feature vector)
-						if (addLearnedAssertions){
-							// Adding SP assertion
-							HashSet<String> uniqueAssertions = new HashSet<String>();
-							for (ElementFeatures ef: edge.getTargetStateVertex().getElementFeatures()){
-								if (svmPredict(ef)==true){
-									String elementPatternAssertion = ef.getElementPatternAssertion();
-									elementPatternAssertion =  elementPatternAssertion.replace("isElementPatternFullPresent", "isElementPatternTagPresent");
-									if (elementPatternAssertion!=null && elementPatternAssertion.length()<4000)
-										uniqueAssertions.add(elementPatternAssertion);
-								}
-							}
-							for (String asseertion: uniqueAssertions){
-								testMethod.addStatement(asseertion + "; // predicted pattern assertion");
-								predictedAssertions++;
-								totalAssertions++;
-							}
-
-						}
-
-
-						// Adding assertions
-						if (edge.getTargetStateVertex().getAssertions().size()>0){
-
-
-							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
-								String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
-								String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
-
-
-								// Adding reused assertion to the method
-								if (addReusedAssertions){
-									if (assertionOringin.contains("reused assertion")){
-										testMethod.addStatement(assertion + "; // " + assertionOringin);
-										reusedAssertions++;
-										ElementFullMatch++;
-										totalAssertions++;
+							// Adding assertions
+							if (edge.getTargetStateVertex().getAssertions().size()>0){
+								for (int i=0;i<edge.getTargetStateVertex().getAssertedElementPatters().size();i++){
+									String assertion = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertion();
+									String assertionOringin = edge.getTargetStateVertex().getAssertedElementPatters().get(i).getAssertionOrigin(); 
+									// Adding reused assertion to the method
+									if (addReusedAssertions){
+										if (assertionOringin.contains("reused assertion")){
+											checkMethod.addStatement(assertion + "; // " + assertionOringin);
+											reusedAssertions++;
+											ElementFullMatch++;
+											totalAssertions++;
+										}
+									}
+									// Adding generated assertion to the method
+									if (addGeneratedAssertions){
+										if (assertionOringin.contains("generated assertion")){
+											//testMethod.addStatement("\n");
+											checkMethod.addStatement(assertion + "; // " + assertionOringin+"\n");
+											generatedAssertions++;
+											totalAssertions++;
+											if (assertionOringin.contains("ElementTagAttMatch")){
+												ElementTagAttMatch++;
+											}
+											if (assertionOringin.contains("PatternFullMatch")){
+												PatternFullMatch++;
+											}
+											if (assertionOringin.contains("PatternTagAttMatch")){
+												PatternTagAttMatch++;
+											}
+											if (assertionOringin.contains("PatternTagMatch")){
+												PatternTagMatch++;
+											}
+											if (assertionOringin.contains("AEP for Original")){
+												AEPforOriginalAssertions++;	
+											}
+										}
 									}
 								}
-
-								// Adding generated assertion to the method
-								if (addGeneratedAssertions){
-									if (assertionOringin.contains("generated assertion")){
-										//testMethod.addStatement("\n");
-										testMethod.addStatement(assertion + "; // " + assertionOringin+"\n");
-										generatedAssertions++;
-										totalAssertions++;
-										if (assertionOringin.contains("ElementTagAttMatch"))
-											ElementTagAttMatch++;
-										//if (assertionOringin.contains("ElementTagMatch"))
-										//	ElementTagMatch++;
-										if (assertionOringin.contains("PatternFullMatch"))
-											PatternFullMatch++;
-										if (assertionOringin.contains("PatternTagAttMatch"))
-											PatternTagAttMatch++;
-										if (assertionOringin.contains("PatternTagMatch"))
-											PatternTagMatch++;
-										if (assertionOringin.contains("AEP for Original"))
-											AEPforOriginalAssertions++;									
-									}
-								}
-
 							}
 						}
+						// adding the check state method to the file
+						checkMethods.add(checkMethod);
 					}
-					
-					
+
+
 				}				
 				
 
@@ -1921,7 +2006,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					String fileName = null;
 
 					JavaTestGenerator generator =
-							new JavaTestGenerator(packagename, CLASS_NAME, sfg.getInitialState().getUrl(), testMethods);
+							new JavaTestGenerator(packagename, CLASS_NAME, sfg.getInitialState().getUrl(), testMethods, checkMethods);
 
 					fileName = generator.generate(DomUtils.addFolderSlashIfNeeded(TEST_SUITE_PATH), FILE_NAME_TEMPLATE);
 
@@ -1937,6 +2022,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 				counter++;
 				testMethods.clear(); // clearing testMethods for the next JUnit file
+				checkMethods.clear();
 			}
 		}
 
@@ -1970,7 +2056,22 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		System.out.println("Total #PatternTagMatch: " + PatternTagMatch);
 		System.out.println("Total #predictedAssertions: " + predictedAssertions);
 		System.out.println("Total #AEPforOriginalAssertions: " + AEPforOriginalAssertions);
+		
+		System.out.println("numberOfStatesInTestSuite: " + numberOfStatesInTestSuite);
+		
+		System.out.println("Average number of assertions per state: " + totalAssertions / numberOfStatesInTestSuite);
 
+		
+		System.out.println("randElementTagAttAssertions: " + randElementTagAttAssertions);
+		System.out.println("randPatternTagAssertions: " + randPatternTagAssertions);
+		System.out.println("randPatternFullAssertions: " + randPatternFullAssertions);
+				
+		System.out.println("randElementTagAttAssertionsOnStates: " + randElementTagAttAssertionsOnStates);
+		System.out.println("randPatternTagAssertionsOnStates:" + randPatternTagAssertionsOnStates);
+		System.out.println("randPatternFullAssertionsOnStates: " + randPatternFullAssertionsOnStates);
+		
+		int sum = randElementTagAttAssertionsOnStates + randPatternTagAssertionsOnStates + randPatternFullAssertionsOnStates;
+		System.out.println("Average number of random assertions per state: " + sum / 66);
 	}
 
 
@@ -2044,18 +2145,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					continue;
 				//System.out.println("The DOM element is: " + element);
 				
-				AssertedElementPattern aep = new AssertedElementPattern(element, "", "\"" + xpath + "\""); // creating an AssertedElementPattern without any assertion text
+				AssertedElementPattern aep = new AssertedElementPattern(element, "", "By.xpath(\"" + xpath + "\")"); // creating an AssertedElementPattern without any assertion text
 				// generate element/pattern assertions in the form of strings for each DOM element
 				String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
 				String patternTagAssertion =  generatePatternAssertion(aep, "PatternTagMatch").getAssertion();
-				String patternSimilarAssertion =  generatePatternAssertion(aep, "SimilarAssertion").getAssertion();
 				String patternFullAssertion =  generatePatternAssertion(aep, "PatternFullMatch").getAssertion();
 				
 				tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
 				tempListOfpatternTagAssertions.add(patternTagAssertion); 
-				tempListOfpatternSimilarAssertions.add(patternSimilarAssertion);
-				tempListOfpatternFullAssertions.add(patternFullAssertion);
-				
+				tempListOfpatternFullAssertions.add(patternFullAssertion);				
 			}
 
 
@@ -2115,24 +2213,51 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			cloneState.addElementTagAttAssertion(assertion);
 		for (String assertion: tempListOfpatternTagAssertions)
 			cloneState.addPatternTagAssertion(assertion);
-		for (String assertion: tempListOfpatternSimilarAssertions)
-			cloneState.addPatternSimilarAssertion(assertion);
 		for (String assertion: tempListOfpatternFullAssertions)
 			cloneState.addPatternFullAssertion(assertion);
 
 		// Emptying the temp lists
 		tempListOfelementTagAttAssertions.clear();
 		tempListOfpatternTagAssertions.clear();
-		tempListOfpatternSimilarAssertions.clear();
 		tempListOfpatternFullAssertions.clear();	
 	}
 	
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex newState) {
-		
-		if (newState.getId()==0){
+		if (newState.getId()==0 && loadInitialSFGFromFile == false && loadExtendedSFGFromFile == false){
+			System.out.println("JUST FOR TEST CASE GENERATION");
 			browser = context.getBrowser();
-			onFireEvent(context, null, null, newState);
+			try {
+				Object webelementObjs = context.getBrowser().executeJavaScript("return document.getElementsByTagName(\"*\");");
+				ArrayList webelements = (ArrayList) webelementObjs;
+				WebElement webelement = null;
+				for (int i=0;i<webelements.size();i++){
+					webelement  = (WebElement) webelements.get(i);
+					String xpath = getXPath(webelement);
+					Element element = getElementFromXpath(xpath, context.getBrowser());
+					if (element.getTagName().toUpperCase().equals("HTML") || 
+							element.getTagName().toUpperCase().equals("HEAD") ||
+							element.getTagName().toUpperCase().equals("META") ||
+							element.getTagName().toUpperCase().equals("BODY"))
+						continue;
+					//System.out.println("The DOM element is: " + element);		
+					AssertedElementPattern aep = new AssertedElementPattern(element, "", "By.xpath(\"" + xpath + "\")"); // creating an AssertedElementPattern without any assertion text
+					// generate element/pattern assertions in the form of strings for each DOM element
+					String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
+					String patternTagAssertion =  generatePatternAssertion(aep, "PatternTagMatch").getAssertion();
+					String patternFullAssertion =  generatePatternAssertion(aep, "PatternFullMatch").getAssertion();
+					
+					tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
+					tempListOfpatternTagAssertions.add(patternTagAssertion); 
+					tempListOfpatternFullAssertions.add(patternFullAssertion);				
+				}			
+			} catch (XPathExpressionException xe) {
+				LOG.info("XPathExpressionException!");
+				xe.printStackTrace();
+			} catch(Exception e){
+				LOG.info("Could not execute script");
+				e.printStackTrace();
+			}
 		}
 		
 		// Adding DOM elements observed in the browser to the new state
@@ -2140,18 +2265,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			newState.addElementTagAttAssertion(assertion);
 		for (String assertion: tempListOfpatternTagAssertions)
 			newState.addPatternTagAssertion(assertion);
-		for (String assertion: tempListOfpatternSimilarAssertions)
-			newState.addPatternSimilarAssertion(assertion);
 		for (String assertion: tempListOfpatternFullAssertions)
 			newState.addPatternFullAssertion(assertion);
 
 		// Emptying the temp lists
 		tempListOfelementTagAttAssertions.clear();
 		tempListOfpatternTagAssertions.clear();
-		tempListOfpatternSimilarAssertions.clear();
 		tempListOfpatternFullAssertions.clear();	
 		
-		
+	
 		
 		
 		// Getting feature vector of block DOM elements [label=-1 (if manualTestPath is not creatred) and 0 otherwise], to be predicted by the trained SVM.
@@ -2319,6 +2441,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			return null;
 
 		if (stateID!=StateToBeMutated)
+			return null;
+		
+		if (MutationOperatorCode==-1)  // the -1 operator code performs no javascript mutation but running the mutant application
 			return null;
 
 		/* DOM-based mutation operator
