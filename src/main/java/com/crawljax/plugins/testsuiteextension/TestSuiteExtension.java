@@ -1659,41 +1659,11 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		int counter = 0, totalAssertions = 0, predictedAssertions = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
 				ElementFullMatch = 0, ElementTagAttMatch = 0, RegionFullMatch = 0, RegionTagAttMatch = 0, RegionTagMatch = 0, AEPforOriginalAssertions=0;
 
-		int randElementTagAttAssertionsOnStates = 0, randRegionTagAssertionsOnStates =0, randRegionFullAssertionsOnStates = 0;
+		int randElementTagAttAssertionsOnStates = 0, randRegionTagAssertionsOnStates =0, randRegionTagAttAssertionsOnStates =0, randRegionFullAssertionsOnStates = 0;
+		
+		List<String> randomAssertionsPool = new ArrayList<String>();
 
 		int numberOfStatesInTestSuite = 0;
-
-		// applying randomized assertion generation
-		if (addRandomAssertions==true){
-			for (StateVertex state: sfg.getAllStates()){
-				// shuffling the assertions to select a random subset
-				List<String> elementTagAttAssertions = new ArrayList<String>(state.getElementTagAttAssertions());
-				Collections.shuffle(elementTagAttAssertions);
-				List<String> regionTagAssertions = new ArrayList<String>(state.getRegionTagAssertions());
-				Collections.shuffle(regionTagAssertions);
-				List<String> regionTagAttAssertions = new ArrayList<String>(state.getRegionTagAttAssertions());
-				Collections.shuffle(regionTagAttAssertions);
-				List<String> regionFullAssertions = new ArrayList<String>(state.getRegionFullAssertions());
-				Collections.shuffle(regionFullAssertions);
-
-				state.clearElementTagAttAssertions();
-				state.clearRegionTagAssertions();
-				state.clearRegionFullAssertions();
-				for (int i=0;i<elementTagAttAssertions.size();i++){
-					state.addElementTagAttAssertion(elementTagAttAssertions.get(i));
-					randElementTagAttAssertionsOnStates++;
-				}				
-				for (int i=0;i<regionTagAssertions.size();i++){
-					state.addRegionTagAssertion(regionTagAssertions.get(i));
-					randRegionTagAssertionsOnStates++;
-				}
-				for (int i=0;i<regionFullAssertions.size();i++){
-					state.addRegionFullAssertion(regionFullAssertions.get(i));
-					randRegionFullAssertionsOnStates++;
-				}				
-			}
-		}	
-
 
 
 		for (List<GraphPath<StateVertex, Eventable>> paths : results) {
@@ -1752,94 +1722,49 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					TestMethod checkMethod9 = new TestMethod("checkState" + edge.getSourceStateVertex().getId() + "_RandAssertions4");
 					TestMethod checkMethod10 = new TestMethod("checkState" + edge.getSourceStateVertex().getId() + "_RandAssertions5");
 
-					/* Adding random assertions */
-
-					// Adding random assertion to the method
-					int numberOfRegionFullAssertionsToSelect = 2;
-					int numberOfElementTagAttAssertionsToSelect = 2;
-					int numberOfRegionTagAssertionsToSelect = 1;
-
+					/* Adding 5 random assertions */
 					if (addRandomAssertions==true){
+
 						if (edge.getSourceStateVertex().getId()==0){
 							checkMethod6.addStatement(rand1AssertionForState0);
 							checkMethod7.addStatement(rand2AssertionForState0);
 							checkMethod8.addStatement(rand3AssertionForState0);
 							checkMethod9.addStatement(rand4AssertionForState0);
 							checkMethod10.addStatement(rand5AssertionForState0);
-						}
+						}else{
 
-						int randAssertionCount = 0;
-						for (String assertion : edge.getSourceStateVertex().getElementTagAttAssertions()){
-							if (randAssertionCount<2){
-								checkMethod6.addStatement(assertion + "; // Random element assertion");
-								randAssertionCount++;  randElementTagAttAssertions++;  continue;
-							}
-							if (randAssertionCount<4){
-								checkMethod7.addStatement(assertion + "; // Random element assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<6){
-								checkMethod8.addStatement(assertion + "; // Random element assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<8){
-								checkMethod9.addStatement(assertion + "; // Random element assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<10){
-								checkMethod10.addStatement(assertion + "; // Random element assertion");
-								randAssertionCount++;  continue;
-							}							
-						}
-						randAssertionCount = 0;
-						for (String assertion : edge.getSourceStateVertex().getRegionTagAssertions()){ //    
-							if (assertion.length()>4000)
-								continue;
-							if (randAssertionCount<2){
-								checkMethod6.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  randRegionTagAssertions++;  continue;
-							}
-							if (randAssertionCount<4){
-								checkMethod7.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<6){
-								checkMethod8.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<8){
-								checkMethod9.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<10){
-								checkMethod10.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  continue;
-							}
-						}
-						randAssertionCount = 0;
-						for (String assertion : edge.getSourceStateVertex().getRegionFullAssertions()){
-							if (assertion.length()>4000)
-								continue;
-							if (randAssertionCount<2){
-								checkMethod6.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  randRegionFullAssertions++;  continue;
-							}
-							if (randAssertionCount<4){
-								checkMethod7.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<6){
-								checkMethod8.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<8){
-								checkMethod9.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  continue;
-							}							
-							if (randAssertionCount<10){
-								checkMethod10.addStatement(assertion + "; // Random region assertion");
-								randAssertionCount++;  continue;
-							}
+							// applying randomized assertion generation
+							randomAssertionsPool.clear();
+							// shuffling the assertions to select a random subset
+							for (String assertion: edge.getSourceStateVertex().getElementTagAttAssertions())
+								if (assertion.length()<4000)
+									randomAssertionsPool.add(assertion);
+							for (String assertion: edge.getSourceStateVertex().getRegionTagAssertions())
+								if (assertion.length()<4000)
+									randomAssertionsPool.add(assertion);
+							for (String assertion: edge.getSourceStateVertex().getRegionTagAttAssertions())
+								if (assertion.length()<4000)
+									randomAssertionsPool.add(assertion);
+							for (String assertion: edge.getSourceStateVertex().getRegionFullAssertions())
+								if (assertion.length()<4000)
+									randomAssertionsPool.add(assertion);
+
+
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod6.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod7.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod8.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod9.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod10.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
 						}
 					}
 
@@ -2139,82 +2064,44 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 						// adding random assertions
+						/* Adding 5 random assertions */
 						if (addRandomAssertions==true){
-							int randAssertionCount = 0;
-							for (String assertion : edge.getTargetStateVertex().getElementTagAttAssertions()){
-								if (randAssertionCount<2){
-									checkMethod6.addStatement(assertion + "; // Random element assertion");
-									randAssertionCount++;  randElementTagAttAssertions++;  continue;
-								}
-								if (randAssertionCount<4){
-									checkMethod7.addStatement(assertion + "; // Random element assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<6){
-									checkMethod8.addStatement(assertion + "; // Random element assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<8){
-									checkMethod9.addStatement(assertion + "; // Random element assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<10){
-									checkMethod10.addStatement(assertion + "; // Random element assertion");
-									randAssertionCount++;  continue;
-								}							
-							}
-							randAssertionCount = 0;
-							for (String assertion : edge.getTargetStateVertex().getRegionTagAssertions()){ //    
-								if (assertion.length()>4000)
-									continue;
-								if (randAssertionCount<2){
-									checkMethod6.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  randRegionTagAssertions++;  continue;
-								}
-								if (randAssertionCount<4){
-									checkMethod7.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<6){
-									checkMethod8.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<8){
-									checkMethod9.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<10){
-									checkMethod10.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  continue;
-								}
-							}
-							randAssertionCount = 0;
-							for (String assertion : edge.getTargetStateVertex().getRegionFullAssertions()){
-								if (assertion.length()>4000)
-									continue;
-								if (randAssertionCount<2){
-									checkMethod6.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  randRegionFullAssertions++;  continue;
-								}
-								if (randAssertionCount<4){
-									checkMethod7.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<6){
-									checkMethod8.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<8){
-									checkMethod9.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  continue;
-								}							
-								if (randAssertionCount<10){
-									checkMethod10.addStatement(assertion + "; // Random region assertion");
-									randAssertionCount++;  continue;
-								}
-							}
+
+							// applying randomized assertion generation
+							randomAssertionsPool.clear();
+							// shuffling the assertions to select a random subset
+							for (String assertion: edge.getTargetStateVertex().getElementTagAttAssertions())
+								if (assertion.length()<4000)
+									randomAssertionsPool.add(assertion);
+							for (String assertion: edge.getTargetStateVertex().getRegionTagAssertions())
+								if (assertion.length()<4000)
+									randomAssertionsPool.add(assertion);
+							for (String assertion: edge.getTargetStateVertex().getRegionTagAttAssertions())
+								if (assertion.length()<4000)
+									randomAssertionsPool.add(assertion);
+							for (String assertion: edge.getTargetStateVertex().getRegionFullAssertions())
+								if (assertion.length()<4000)
+									randomAssertionsPool.add(assertion);
+
+
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod6.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod7.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod8.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod9.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+							Collections.shuffle(randomAssertionsPool);
+							for (int i=0; i<5; i++)
+								checkMethod10.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
 						}
 
+						
 						// Adding original assertion to the method
 						if (addOriginalAssertions){
 							if (edge.getTargetStateVertex().getAssertions().size()>0){
