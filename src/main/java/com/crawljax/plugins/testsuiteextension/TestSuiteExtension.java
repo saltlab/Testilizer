@@ -1557,11 +1557,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		ArrayList<String> parentAttributes = new ArrayList<String>(aep.getParentAttributes());
 
 		ArrayList<String> childrenTags = new ArrayList<String>(aep.getChildrenTagName());
-		ArrayList<String> childrenTexts;
-		if (aep.getChildrenTextContent().size()<=10)
-			childrenTexts = new ArrayList<String>(aep.getChildrenTextContent());
-		else
-			childrenTexts = new ArrayList<String>();
+		ArrayList<String> childrenTexts = new ArrayList<String>();
+
+		for (String text: aep.getChildrenTextContent())
+			if (text.length() < 100)
+				childrenTexts.add(text);
+			else
+				childrenTexts.add("");
+
+
 		ArrayList<ArrayList<String>> childrenAttributes = new ArrayList<ArrayList<String>>();
 		for (int i=0; i < aep.getChildrenAttributes().size(); i++)
 			childrenAttributes.add(aep.getChildrenAttributes().get(i));
@@ -1586,8 +1590,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		regionCheckAssertion += "\t\tchildrenElements.clear();\n";
 		for (int k=0; k<childrenTags.size(); k++){
-			//regionCheckAssertion += "childrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"" + childrenTexts.get(k).replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
-			regionCheckAssertion += "\t\tchildrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"\", new ArrayList<String>(Arrays.asList(\"";
+			regionCheckAssertion += "childrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"" + childrenTexts.get(k).replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
+			//regionCheckAssertion += "\t\tchildrenElements.add(new DOMElement(\"" + childrenTags.get(k) + "\", \"\", new ArrayList<String>(Arrays.asList(\"";
 			if (k < childrenAttributes.size() && childrenAttributes.get(k).size()>0){ // check if attributes are less than tags due to being null
 				for (int j=0; j < childrenAttributes.get(k).size()-1; j++)
 					regionCheckAssertion += childrenAttributes.get(k).get(j).replace("\"", "\\\"") + "\",\"";
@@ -1596,8 +1600,10 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				regionCheckAssertion += "\"))));\n";
 		}
 
-		if (howMatched.equals("RegionTagMatch") || howMatched.equals("SimilarAssertion"))
+		if (howMatched.equals("RegionTagMatch"))
 			regionCheckAssertion += "\t\tassertTrue(isElementRegionTagPresent(parentElement , element, childrenElements))";
+		else if (howMatched.equals("RegionTagAttMatch") || howMatched.equals("SimilarAssertion"))
+			regionCheckAssertion += "\t\tassertTrue(isElementRegionTagAttPresent(parentElement , element, childrenElements))";
 		else
 			regionCheckAssertion += "\t\tassertTrue(isElementRegionFullPresent(parentElement , element, childrenElements))";
 
@@ -1854,7 +1860,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					}
 
 					// Adding reused/generated assertions
-					if (edge.getSourceStateVertex().getAssertions().size()>0){
+					if (edge.getSourceStateVertex().getAssertions().size()>0)
 						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
 							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
 							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
@@ -1877,85 +1883,76 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							}
 						}
 
-						// prioritizing assertions
+
+					// prioritizing assertions: add RegionFullMatch as much as possible 
+					if (edge.getSourceStateVertex().getAssertions().size()>0)
 						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
 							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
-
 							if (assertion.length()>4000)
 								continue;
-
 							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
 							// Adding generated assertion to the method
 							if (addGeneratedAssertions){
 								if (assertionOringin.contains("generated assertion")){
 									//testMethod.addStatement("\n");
-									if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("RegionTagAttMatch") || assertionOringin.contains("AEP for Original"))
+									if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("AEP for Original")){
 										if (checkMethod3.getStatements().size() < 5)
 											checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
-									if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("RegionTagAttMatch") || 
-											assertionOringin.contains("AEP for Original") || checkMethod5.getStatements().size() < 5)
-										if (addAllAssertions){
-											checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
-											totalAssertions++;
-										}
-									generatedAssertions++;
-									if (assertionOringin.contains("RegionFullMatch")){
-										RegionFullMatch++;
-									}
-									if (assertionOringin.contains("RegionTagAttMatch")){
-										RegionTagAttMatch++;
-									}
-									if (assertionOringin.contains("AEP for Original")){
-										AEPforOriginalAssertions++;	
+										if (checkMethod5.getStatements().size() < 5)
+											if (addAllAssertions){
+												checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+												totalAssertions++;
+											}
+										generatedAssertions++;
+										if (assertionOringin.contains("RegionFullMatch"))
+											RegionFullMatch++;
+										if (assertionOringin.contains("AEP for Original"))
+											AEPforOriginalAssertions++;	
 									}
 								}
 							}
 						}
-
+					// RegionTagAttMatch
+					if (edge.getSourceStateVertex().getAssertions().size()>0)
 						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
 							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
 							if (assertion.length()>4000)
 								continue;
-
 							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
 							// Adding generated assertion to the method
 							if (addGeneratedAssertions){
 								if (assertionOringin.contains("generated assertion")){
-									if (checkMethod3.getStatements().size() < 5)
-										checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
-									if (checkMethod5.getStatements().size() < 5)
-										if (addAllAssertions){
-											checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
-											totalAssertions++;
-										}
-									generatedAssertions++;
-
-									if (assertionOringin.contains("ElementTagAttMatch")){
-										ElementTagAttMatch++;
-									}
-									if (assertionOringin.contains("RegionTagMatch")){
-										RegionTagMatch++;
+									//testMethod.addStatement("\n");
+									if (assertionOringin.contains("RegionTagAttMatch")){
+										if (checkMethod3.getStatements().size() < 5)
+											checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
+										if (checkMethod5.getStatements().size() < 5)
+											if (addAllAssertions){
+												checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+												totalAssertions++;
+											}
+										generatedAssertions++;
+										if (assertionOringin.contains("RegionTagAttMatch"))
+											RegionTagAttMatch++;
 									}
 								}
 							}
 						}
 
-
-					}
-					// Adding learned assertions (SVM predicting for a feature vector)
+					// Similar Region
+					// Adding learned assertions (SVM predicted for a feature vector)
 					if (addLearnedAssertions){
 						// Adding SP assertion
 						HashSet<String> uniqueAssertions = new HashSet<String>();
-						
+
 						if (edge.getSourceStateVertex().getId()==0){
 							for (ElementFeatures ef: indexPageElementsFeatures)
 								edge.getSourceStateVertex().addElementFeatures(ef);
 						}
-						
+
 						for (ElementFeatures ef: edge.getSourceStateVertex().getElementFeatures()){
 							if (svmPredict(ef)==true){
 								String elementRegionAssertion = ef.getElementRegionAssertion();
-								elementRegionAssertion =  elementRegionAssertion.replace("isElementRegionFullPresent", "isElementRegionTagPresent");
 								if (elementRegionAssertion!=null && elementRegionAssertion.length()<4000)
 									uniqueAssertions.add(elementRegionAssertion);
 							}
@@ -1972,7 +1969,61 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						}
 					}
 
-
+					// ElementTagAttMatch
+					if (edge.getSourceStateVertex().getAssertions().size()>0)
+						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
+							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
+							if (assertion.length()>4000)
+								continue;
+							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+							// Adding generated assertion to the method
+							if (addGeneratedAssertions){
+								if (assertionOringin.contains("generated assertion")){
+									//testMethod.addStatement("\n");
+									if (assertionOringin.contains("ElementTagAttMatch")){
+										if (checkMethod3.getStatements().size() < 5)
+											checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
+										if (checkMethod5.getStatements().size() < 5)
+											if (addAllAssertions){
+												checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+												totalAssertions++;
+											}
+										generatedAssertions++;
+										if (assertionOringin.contains("ElementTagAttMatch"))
+											RegionTagMatch++;
+									}
+								}
+							}
+						}
+					
+					// RegionTagMatch
+					if (edge.getSourceStateVertex().getAssertions().size()>0)
+						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
+							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
+							if (assertion.length()>4000)
+								continue;
+							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+							// Adding generated assertion to the method
+							if (addGeneratedAssertions){
+								if (assertionOringin.contains("generated assertion")){
+									//testMethod.addStatement("\n");
+									if (assertionOringin.contains("RegionTagMatch")){
+										if (checkMethod3.getStatements().size() < 5)
+											checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
+										if (checkMethod5.getStatements().size() < 5)
+											if (addAllAssertions){
+												checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+												totalAssertions++;
+											}
+										generatedAssertions++;
+										if (assertionOringin.contains("RegionTagMatch"))
+											RegionTagMatch++;
+									}
+								}
+							}
+						}
+					
+					
 
 
 					// applying the click
@@ -2162,27 +2213,28 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						}
 
 						// Adding original assertion to the method
-						if (edge.getTargetStateVertex().getAssertions().size()>0){
-							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
-								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
-								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
-								if (assertionOringin.contains("original assertion")){
-									checkMethod1.addStatement(assertion + "; // " + assertionOringin+"\n");
-									if (addAllAssertions){
-										checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
-										totalAssertions++;
+						if (addOriginalAssertions){
+							if (edge.getTargetStateVertex().getAssertions().size()>0){
+								for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
+									String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
+									String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+									if (assertionOringin.contains("original assertion")){
+										checkMethod1.addStatement(assertion + "; // " + assertionOringin+"\n");
+										if (addAllAssertions){
+											checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+											totalAssertions++;
+										}
+										origAndReusedAssertions++;
 									}
-									origAndReusedAssertions++;
 								}
+
 							}
 						}
 
 						// Adding reused/generated assertions
-						if (edge.getTargetStateVertex().getAssertions().size()>0){
+						if (edge.getTargetStateVertex().getAssertions().size()>0)
 							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
 								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
-								if (assertion.length()>4000)
-									continue;
 								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
 
 								// problem with Claroline app
@@ -2195,7 +2247,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 										checkMethod2.addStatement(assertion + "; // " + assertionOringin);
 										if (addAllAssertions){
 											checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
-											totalAssertions++;										
+											totalAssertions++;
 										}
 										reusedAssertions++;
 										ElementFullMatch++;
@@ -2203,7 +2255,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								}
 							}
 
-							// prioritizing assertions
+
+						// prioritizing assertions: add RegionFullMatch as much as possible 
+						if (edge.getTargetStateVertex().getAssertions().size()>0)
 							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
 								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
 								if (assertion.length()>4000)
@@ -2213,64 +2267,64 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								if (addGeneratedAssertions){
 									if (assertionOringin.contains("generated assertion")){
 										//testMethod.addStatement("\n");
-										if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("RegionTagAttMatch") || assertionOringin.contains("AEP for Original"))
+										if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("AEP for Original")){
 											if (checkMethod3.getStatements().size() < 5)
 												checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
-										if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("RegionTagAttMatch") || 
-												assertionOringin.contains("AEP for Original") || checkMethod5.getStatements().size() < 5)
-											if (addAllAssertions){
-												checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
-												totalAssertions++;
-											}
-										generatedAssertions++;
-										if (assertionOringin.contains("RegionFullMatch")){
-											RegionFullMatch++;
-										}
-										if (assertionOringin.contains("RegionTagAttMatch")){
-											RegionTagAttMatch++;
-										}
-										if (assertionOringin.contains("AEP for Original")){
-											AEPforOriginalAssertions++;	
+											if (checkMethod5.getStatements().size() < 5)
+												if (addAllAssertions){
+													checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+													totalAssertions++;
+												}
+											generatedAssertions++;
+											if (assertionOringin.contains("RegionFullMatch"))
+												RegionFullMatch++;
+											if (assertionOringin.contains("AEP for Original"))
+												AEPforOriginalAssertions++;	
 										}
 									}
 								}
 							}
-
+						// RegionTagAttMatch
+						if (edge.getTargetStateVertex().getAssertions().size()>0)
 							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
 								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
+								if (assertion.length()>4000)
+									continue;
 								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
 								// Adding generated assertion to the method
 								if (addGeneratedAssertions){
 									if (assertionOringin.contains("generated assertion")){
-										if (checkMethod3.getStatements().size() < 5)
-											checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
-										if (checkMethod5.getStatements().size() < 5)
-											if (addAllAssertions){
-												totalAssertions++;
-												checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
-											}
-										generatedAssertions++;
-
-										if (assertionOringin.contains("ElementTagAttMatch")){
-											ElementTagAttMatch++;
-										}
-										if (assertionOringin.contains("RegionTagMatch")){
-											RegionTagMatch++;
+										//testMethod.addStatement("\n");
+										if (assertionOringin.contains("RegionTagAttMatch")){
+											if (checkMethod3.getStatements().size() < 5)
+												checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
+											if (checkMethod5.getStatements().size() < 5)
+												if (addAllAssertions){
+													checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+													totalAssertions++;
+												}
+											generatedAssertions++;
+											if (assertionOringin.contains("RegionTagAttMatch"))
+												RegionTagAttMatch++;
 										}
 									}
 								}
 							}
 
-
-						}
-						// Adding learned assertions (SVM predicting for a feature vector)
+						// Similar Region
+						// Adding learned assertions (SVM predicted for a feature vector)
 						if (addLearnedAssertions){
 							// Adding SP assertion
 							HashSet<String> uniqueAssertions = new HashSet<String>();
+
+							if (edge.getTargetStateVertex().getId()==0){
+								for (ElementFeatures ef: indexPageElementsFeatures)
+									edge.getTargetStateVertex().addElementFeatures(ef);
+							}
+
 							for (ElementFeatures ef: edge.getTargetStateVertex().getElementFeatures()){
 								if (svmPredict(ef)==true){
 									String elementRegionAssertion = ef.getElementRegionAssertion();
-									elementRegionAssertion =  elementRegionAssertion.replace("isElementRegionFullPresent", "isElementRegionTagPresent");
 									if (elementRegionAssertion!=null && elementRegionAssertion.length()<4000)
 										uniqueAssertions.add(elementRegionAssertion);
 								}
@@ -2286,6 +2340,60 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								predictedAssertions++;
 							}
 						}
+
+						// ElementTagAttMatch
+						if (edge.getTargetStateVertex().getAssertions().size()>0)
+							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
+								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
+								if (assertion.length()>4000)
+									continue;
+								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+								// Adding generated assertion to the method
+								if (addGeneratedAssertions){
+									if (assertionOringin.contains("generated assertion")){
+										//testMethod.addStatement("\n");
+										if (assertionOringin.contains("ElementTagAttMatch")){
+											if (checkMethod3.getStatements().size() < 5)
+												checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
+											if (checkMethod5.getStatements().size() < 5)
+												if (addAllAssertions){
+													checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+													totalAssertions++;
+												}
+											generatedAssertions++;
+											if (assertionOringin.contains("ElementTagAttMatch"))
+												RegionTagMatch++;
+										}
+									}
+								}
+							}
+						
+						// RegionTagMatch
+						if (edge.getTargetStateVertex().getAssertions().size()>0)
+							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
+								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
+								if (assertion.length()>4000)
+									continue;
+								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+								// Adding generated assertion to the method
+								if (addGeneratedAssertions){
+									if (assertionOringin.contains("generated assertion")){
+										//testMethod.addStatement("\n");
+										if (assertionOringin.contains("RegionTagMatch")){
+											if (checkMethod3.getStatements().size() < 5)
+												checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
+											if (checkMethod5.getStatements().size() < 5)
+												if (addAllAssertions){
+													checkMethod5.addStatement(assertion + "; // " + assertionOringin+"\n"); // add to all_assertions
+													totalAssertions++;
+												}
+											generatedAssertions++;
+											if (assertionOringin.contains("RegionTagMatch"))
+												RegionTagMatch++;
+										}
+									}
+								}
+							}
 
 
 
@@ -2582,13 +2690,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				e.printStackTrace();
 			}
 
-			
-			
+
+
 			// Getting feature vector of block DOM elements [label=-1 (if manualTestPath is not creatred) and 0 otherwise], to be predicted by the trained SVM.
 			indexPageElementsFeatures = getDOMElementsFeatures();
 
 
-			
+
 			//System.out.println(tempListOfelementTagAttAssertions);
 			//System.out.println(tempListOfregionFullAssertions);
 			//System.out.println(tempListOfregionTagAssertions);
