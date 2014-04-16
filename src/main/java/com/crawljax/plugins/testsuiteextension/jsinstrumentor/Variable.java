@@ -143,7 +143,7 @@ public class Variable {
 	 * @throws CrawljaxException
 	 *             If type is unsupported.
 	 */
-	String getDeclaration() throws CrawljaxException {
+	public String getDeclaration() throws CrawljaxException {
 		StringBuffer varDecl = new StringBuffer();
 
 		if (isArray()) {
