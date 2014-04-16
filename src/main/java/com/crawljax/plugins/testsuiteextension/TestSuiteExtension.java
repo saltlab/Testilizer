@@ -138,6 +138,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	// These are to store assertions for all DOM elements in browser state to be added to states in the SFG
 	ArrayList<String> tempListOfelementTagAttAssertions  = new ArrayList<String>(); 
 	ArrayList<String> tempListOfelementFullAssertions  = new ArrayList<String>(); 
+	ArrayList<String> tempListOfregionTagAttAssertions  = new ArrayList<String>(); 
 	ArrayList<String> tempListOfregionTagAssertions  = new ArrayList<String>(); 
 	ArrayList<String> tempListOfregionFullAssertions  = new ArrayList<String>(); 
 	int randElementTagAttAssertions = 0;
@@ -1670,6 +1671,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				Collections.shuffle(elementTagAttAssertions);
 				List<String> regionTagAssertions = new ArrayList<String>(state.getRegionTagAssertions());
 				Collections.shuffle(regionTagAssertions);
+				List<String> regionTagAttAssertions = new ArrayList<String>(state.getRegionTagAttAssertions());
+				Collections.shuffle(regionTagAttAssertions);
 				List<String> regionFullAssertions = new ArrayList<String>(state.getRegionFullAssertions());
 				Collections.shuffle(regionFullAssertions);
 
@@ -2577,10 +2580,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				// generate element/region assertions in the form of strings for each DOM element
 				String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
 				String regionTagAssertion =  generateRegionAssertion(aep, "RegionTagMatch").getAssertion();
+				String regionTagAttAssertion =  generateRegionAssertion(aep, "RegionTagAttMatch").getAssertion();
 				String regionFullAssertion =  generateRegionAssertion(aep, "RegionFullMatch").getAssertion();
 
 				tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
 				tempListOfregionTagAssertions.add(regionTagAssertion); 
+				tempListOfregionTagAttAssertions.add(regionTagAttAssertion); 
 				tempListOfregionFullAssertions.add(regionFullAssertion);				
 			}
 
@@ -2641,12 +2646,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			cloneState.addElementTagAttAssertion(assertion);
 		for (String assertion: tempListOfregionTagAssertions)
 			cloneState.addRegionTagAssertion(assertion);
+		for (String assertion: tempListOfregionTagAttAssertions)
+			cloneState.addRegionTagAttAssertion(assertion);
 		for (String assertion: tempListOfregionFullAssertions)
 			cloneState.addRegionFullAssertion(assertion);
 
 		// Emptying the temp lists
 		tempListOfelementTagAttAssertions.clear();
 		tempListOfregionTagAssertions.clear();
+		tempListOfregionTagAttAssertions.clear();
 		tempListOfregionFullAssertions.clear();	
 	}
 
@@ -2676,10 +2684,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					// generate element/region assertions in the form of strings for each DOM element
 					String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
 					String regionTagAssertion =  generateRegionAssertion(aep, "RegionTagMatch").getAssertion();
+					String regionTagAttAssertion =  generateRegionAssertion(aep, "RegionTagAttMatch").getAssertion();
 					String regionFullAssertion =  generateRegionAssertion(aep, "RegionFullMatch").getAssertion();
 
 					tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
 					tempListOfregionTagAssertions.add(regionTagAssertion); 
+					tempListOfregionTagAttAssertions.add(regionTagAttAssertion); 
 					tempListOfregionFullAssertions.add(regionFullAssertion);				
 				}			
 			} catch (XPathExpressionException xe) {
@@ -2705,6 +2715,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			Collections.shuffle(tempListOfelementTagAttAssertions);
 			Collections.shuffle(tempListOfregionFullAssertions);
 			Collections.shuffle(tempListOfregionTagAssertions);
+			Collections.shuffle(tempListOfregionTagAttAssertions);
 
 			//int numberOfRegionFullAssertionsToSelect = 2;
 			//int numberOfElementTagAttAssertionsToSelect = 2;
@@ -2770,10 +2781,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					// generate element/region assertions in the form of strings for each DOM element
 					String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
 					String regionTagAssertion =  generateRegionAssertion(aep, "RegionTagMatch").getAssertion();
+					String regionTagAttAssertion =  generateRegionAssertion(aep, "RegionTagAttMatch").getAssertion();
 					String regionFullAssertion =  generateRegionAssertion(aep, "RegionFullMatch").getAssertion();
 
 					tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
 					tempListOfregionTagAssertions.add(regionTagAssertion); 
+					tempListOfregionTagAttAssertions.add(regionTagAttAssertion); 
 					tempListOfregionFullAssertions.add(regionFullAssertion);				
 				}			
 			} catch (XPathExpressionException xe) {
@@ -2790,12 +2803,15 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			newState.addElementTagAttAssertion(assertion);
 		for (String assertion: tempListOfregionTagAssertions)
 			newState.addRegionTagAssertion(assertion);
+		for (String assertion: tempListOfregionTagAttAssertions)
+			newState.addRegionTagAttAssertion(assertion);
 		for (String assertion: tempListOfregionFullAssertions)
 			newState.addRegionFullAssertion(assertion);
 
 		// Emptying the temp lists
 		tempListOfelementTagAttAssertions.clear();
 		tempListOfregionTagAssertions.clear();
+		tempListOfregionTagAttAssertions.clear();
 		tempListOfregionFullAssertions.clear();	
 
 
