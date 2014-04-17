@@ -60,6 +60,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
 
 
@@ -113,12 +114,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 * Settings for my experiments
 	 */
 	//static String appName = "claroline";
-	//static String appName = "photogallery";
-	static String appName = "wolfcms";
+	static String appName = "photogallery";
+	//static String appName = "wolfcms";
 	//static String appName = "eshop1";
 	//static String appName = "eshop2";
 
-	private String testSuiteNameToGenerate = appName + "_EP2";
+	private String testSuiteNameToGenerate = appName + "_EP";
 	//private String testSuiteNameToGenerate = appName + "_EP_Learned1";
 
 	// one should only be true! if two are false then creates sfg files
@@ -187,11 +188,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	private String finalReport ="";
 
-	private String rand1AssertionForState0 = "";
-	private String rand2AssertionForState0 = "";
-	private String rand3AssertionForState0 = "";
-	private String rand4AssertionForState0 = "";
-	private String rand5AssertionForState0 = "";
 
 	private ArrayList<ElementFeatures> indexPageElementsFeatures;
 
@@ -1547,13 +1543,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			return null;
 
 		String elementText = "";//aep.getTextContent();
-		if (aep.getTextContent().length() < 100)
+		if (aep.getTextContent().length() < 50)
 			elementText = aep.getTextContent();
 		ArrayList<String> elementAttributes = new ArrayList<String>(aep.getAttributes());
 
 		String parentTag =  aep.getParentTagName();
 		String parentText =  "";//aep.getParentTextContent();
-		if (aep.getParentTextContent().length() < 100)
+		if (aep.getParentTextContent().length() < 50)
 			elementText = aep.getParentTextContent();
 		ArrayList<String> parentAttributes = new ArrayList<String>(aep.getParentAttributes());
 
@@ -1561,7 +1557,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		ArrayList<String> childrenTexts = new ArrayList<String>();
 
 		for (String text: aep.getChildrenTextContent())
-			if (text.length() < 100)
+			if (text.length() < 50)
 				childrenTexts.add(text);
 			else
 				childrenTexts.add("");
@@ -1626,9 +1622,55 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		if (newaep.getTagName().toUpperCase().equals("BODY"))
 			return null;
 
+
+		ArrayList<String> atts = new ArrayList<String>(aep.getAttributes());
+		String locator = newaep.getAssertedElementLocator();
+		//locator.replace("\")", "\")");
+		String newLocator ="";
+
+		// To combine the css locators for multiple attributes:
+		// => css=E[foo='abc'][foo1='abcs'][foo2='abcd'] and so on...
+		// To combine the xpath locators for multiple attributes:
+		// => //E[@foo="bar" and @foo1="bar1"]
+
+		if (locator.contains("xpath")){
+			if (locator.contains("]\")")){	// xpath finished with ]
+				newLocator += locator.replace("]\")", "");
+				if (atts.size()>0){ // avoiding null
+					for (int j=0; j < atts.size()-1; j++){
+						newLocator += " @" + atts.get(j).replace("\"", "\\\"") + " and ";
+					}
+					newLocator += atts.get(atts.size()-1).replace("\"", "\\\"");
+				}
+				newLocator += "]\")";
+			}else{  // xpath finished withouth ]
+				newLocator += locator.replace("\")", "") + "[";
+				if (atts.size()>0){ // avoiding null
+					for (int j=0; j < atts.size()-1; j++){
+						newLocator += "@" + atts.get(j).replace("\"", "\\\"") + " and @";
+					}
+					newLocator += atts.get(atts.size()-1).replace("\"", "\\\"");
+				}
+				newLocator += "]\")";
+
+			}
+		}else if (locator.contains("cssSelector")){
+			newLocator += locator.replace("\")", "") + "[";
+			if (atts.size()>0){ // avoiding null
+				for (int j=0; j < atts.size()-1; j++){
+					newLocator += atts.get(j).replace("\"", "\\\"") + "][";
+				}
+				newLocator += atts.get(atts.size()-1).replace("\"", "\\\"");
+			}
+			newLocator += "]\")";
+		} else{
+			newLocator = locator;
+		}
+
+
 		switch (howMatched){
 		case "ElementTagAttMatch":
-			newaep.setAssertion("assertTrue(isElementPresent("+ newaep.getAssertedElementLocator() +"))");
+			newaep.setAssertion("assertTrue(isElementPresent("+ newLocator +"))");
 			//System.out.println(newaep);
 			break;
 		case "ElementTagMatch":
@@ -1660,7 +1702,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				ElementFullMatch = 0, ElementTagAttMatch = 0, RegionFullMatch = 0, RegionTagAttMatch = 0, RegionTagMatch = 0, AEPforOriginalAssertions=0;
 
 		int randElementTagAttAssertionsOnStates = 0, randRegionTagAssertionsOnStates =0, randRegionTagAttAssertionsOnStates =0, randRegionFullAssertionsOnStates = 0;
-		
+
 		List<String> randomAssertionsPool = new ArrayList<String>();
 
 		int numberOfStatesInTestSuite = 0;
@@ -1724,48 +1766,41 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 					/* Adding 5 random assertions */
 					if (addRandomAssertions==true){
+						// applying randomized assertion generation
+						randomAssertionsPool.clear();
+						// shuffling the assertions to select a random subset
+						for (String assertion: edge.getSourceStateVertex().getElementTagAttAssertions())
+							if (assertion.length()<4000)
+								randomAssertionsPool.add(assertion);
+						for (String assertion: edge.getSourceStateVertex().getRegionTagAssertions())
+							if (assertion.length()<4000)
+								randomAssertionsPool.add(assertion);
+						for (String assertion: edge.getSourceStateVertex().getRegionTagAttAssertions())
+							if (assertion.length()<4000)
+								randomAssertionsPool.add(assertion);
+						for (String assertion: edge.getSourceStateVertex().getRegionFullAssertions())
+							if (assertion.length()<4000)
+								randomAssertionsPool.add(assertion);
 
-						if (edge.getSourceStateVertex().getId()==0){
-							checkMethod6.addStatement(rand1AssertionForState0);
-							checkMethod7.addStatement(rand2AssertionForState0);
-							checkMethod8.addStatement(rand3AssertionForState0);
-							checkMethod9.addStatement(rand4AssertionForState0);
-							checkMethod10.addStatement(rand5AssertionForState0);
-						}else{
+						int maxToSelelect = 5;
+						if (randomAssertionsPool.size() < maxToSelelect)
+							maxToSelelect = randomAssertionsPool.size();
 
-							// applying randomized assertion generation
-							randomAssertionsPool.clear();
-							// shuffling the assertions to select a random subset
-							for (String assertion: edge.getSourceStateVertex().getElementTagAttAssertions())
-								if (assertion.length()<4000)
-									randomAssertionsPool.add(assertion);
-							for (String assertion: edge.getSourceStateVertex().getRegionTagAssertions())
-								if (assertion.length()<4000)
-									randomAssertionsPool.add(assertion);
-							for (String assertion: edge.getSourceStateVertex().getRegionTagAttAssertions())
-								if (assertion.length()<4000)
-									randomAssertionsPool.add(assertion);
-							for (String assertion: edge.getSourceStateVertex().getRegionFullAssertions())
-								if (assertion.length()<4000)
-									randomAssertionsPool.add(assertion);
-
-
-							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
-								checkMethod6.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
-							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
-								checkMethod7.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
-							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
-								checkMethod8.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
-							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
-								checkMethod9.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
-							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
-								checkMethod10.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
-						}
+						Collections.shuffle(randomAssertionsPool);
+						for (int i=0; i<maxToSelelect; i++)
+							checkMethod6.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+						Collections.shuffle(randomAssertionsPool);
+						for (int i=0; i<maxToSelelect; i++)
+							checkMethod7.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+						Collections.shuffle(randomAssertionsPool);
+						for (int i=0; i<maxToSelelect; i++)
+							checkMethod8.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+						Collections.shuffle(randomAssertionsPool);
+						for (int i=0; i<maxToSelelect; i++)
+							checkMethod9.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
+						Collections.shuffle(randomAssertionsPool);
+						for (int i=0; i<maxToSelelect; i++)
+							checkMethod10.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
 					}
 
 					// Adding original assertion to the method
@@ -1923,7 +1958,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								}
 							}
 						}
-					
+
 					// RegionTagMatch
 					if (edge.getSourceStateVertex().getAssertions().size()>0)
 						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
@@ -1950,8 +1985,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 								}
 							}
 						}
-					
-					
+
+
 
 
 					// applying the click
@@ -2084,24 +2119,28 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 									randomAssertionsPool.add(assertion);
 
 
+							int maxToSelelect = 5;
+							if (randomAssertionsPool.size() < maxToSelelect)
+								maxToSelelect = randomAssertionsPool.size();
+
 							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
+							for (int i=0; i<maxToSelelect; i++)
 								checkMethod6.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
 							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
+							for (int i=0; i<maxToSelelect; i++)
 								checkMethod7.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
 							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
+							for (int i=0; i<maxToSelelect; i++)
 								checkMethod8.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
 							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
+							for (int i=0; i<maxToSelelect; i++)
 								checkMethod9.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
 							Collections.shuffle(randomAssertionsPool);
-							for (int i=0; i<5; i++)
+							for (int i=0; i<maxToSelelect; i++)
 								checkMethod10.addStatement(randomAssertionsPool.get(i) + "; // Random element assertion");
 						}
 
-						
+
 						// Adding original assertion to the method
 						if (addOriginalAssertions){
 							if (edge.getTargetStateVertex().getAssertions().size()>0){
@@ -2257,7 +2296,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 									}
 								}
 							}
-						
+
 						// RegionTagMatch
 						if (edge.getTargetStateVertex().getAssertions().size()>0)
 							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
@@ -2447,6 +2486,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		 */
 
 
+		// This is to be used if resulted in a clone state (clone abstract state)
 		try {
 
 			Object webelementObjs = this.browser.executeJavaScript("return document.getElementsByTagName(\"*\");");
@@ -2462,6 +2502,38 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 						element.getTagName().toUpperCase().equals("BODY"))
 					continue;
 				//System.out.println("The DOM element is: " + element);
+
+				NamedNodeMap elementAttList = element.getAttributes();
+				ArrayList<String> atts = new ArrayList<String>();
+				for (int j = 0; j < elementAttList.getLength(); j++)
+					atts.add(elementAttList.item(j).getNodeName() + "=\"" + elementAttList.item(j).getNodeValue() + "\"");
+
+				String newLocator ="";
+
+				// To combine the xpath locators for multiple attributes:
+				// => //E[@foo="bar" and @foo1="bar1"]
+
+				if (xpath.endsWith("]")){	// xpath finished with ]
+					xpath = xpath.substring(0, xpath.length()-2);  // removing ] form the xpath
+					newLocator += xpath.replace("]", "");
+					if (atts.size()>0){ // avoiding null
+						for (int j=0; j < atts.size()-1; j++){
+							newLocator += " @" + atts.get(j).replace("\"", "\\\"") + " and ";
+						}
+						newLocator += atts.get(atts.size()-1).replace("\"", "\\\"");
+					}
+					newLocator += "]"; // adding back the removed ]
+				}else{  // xpath finished withouth ]
+					newLocator += xpath.replace("\")", "") + "[";
+					if (atts.size()>0){ // avoiding null
+						for (int j=0; j < atts.size()-1; j++){
+							newLocator += "@" + atts.get(j).replace("\"", "\\\"") + " and @";
+						}
+						newLocator += atts.get(atts.size()-1).replace("\"", "\\\"");
+					}
+					newLocator += "]";
+
+				}
 
 				AssertedElementRegion aep = new AssertedElementRegion(element, "", "By.xpath(\"" + xpath + "\")"); // creating an AssertedElementRegion without any assertion text
 				// generate element/region assertions in the form of strings for each DOM element
@@ -2547,10 +2619,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	@Override
 	public void onNewState(CrawlerContext context, StateVertex newState) {
-		if (newState.getId()==0){
-			//if (true)return;
 
-			System.out.println("BLALALALA");
+		//if (loadInitialSFGFromFile == false && loadExtendedSFGFromFile == false)
+		//	return;
+
+		if (newState.getId()==0){
+
+			System.out.println("Adding index page features and random ");
 
 			browser = context.getBrowser();
 			try {
@@ -2566,7 +2641,42 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 							element.getTagName().toUpperCase().equals("META") ||
 							element.getTagName().toUpperCase().equals("BODY"))
 						continue;
-					//System.out.println("The DOM element is: " + element);		
+					//System.out.println("The DOM element is: " + element);	
+
+
+					NamedNodeMap elementAttList = element.getAttributes();
+					ArrayList<String> atts = new ArrayList<String>();
+					for (int j = 0; j < elementAttList.getLength(); j++)
+						atts.add(elementAttList.item(j).getNodeName() + "=\"" + elementAttList.item(j).getNodeValue() + "\"");
+
+					String newLocator ="";
+
+					// To combine the xpath locators for multiple attributes:
+					// => //E[@foo="bar" and @foo1="bar1"]
+
+					if (xpath.endsWith("]")){	// xpath finished with ]
+						xpath = xpath.substring(0, xpath.length()-2);  // removing ] form the xpath
+						newLocator += xpath.replace("]", "");
+						if (atts.size()>0){ // avoiding null
+							for (int j=0; j < atts.size()-1; j++){
+								newLocator += " @" + atts.get(j).replace("\"", "\\\"") + " and ";
+							}
+							newLocator += atts.get(atts.size()-1).replace("\"", "\\\"");
+						}
+						newLocator += "]"; // adding back the removed ]
+					}else{  // xpath finished withouth ]
+						newLocator += xpath.replace("\")", "") + "[";
+						if (atts.size()>0){ // avoiding null
+							for (int j=0; j < atts.size()-1; j++){
+								newLocator += "@" + atts.get(j).replace("\"", "\\\"") + " and @";
+							}
+							newLocator += atts.get(atts.size()-1).replace("\"", "\\\"");
+						}
+						newLocator += "]";
+
+					}
+
+
 					AssertedElementRegion aep = new AssertedElementRegion(element, "", "By.xpath(\"" + xpath + "\")"); // creating an AssertedElementRegion without any assertion text
 					// generate element/region assertions in the form of strings for each DOM element
 					String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
@@ -2586,104 +2696,13 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				LOG.info("Could not execute script");
 				e.printStackTrace();
 			}
-
 
 
 			// Getting feature vector of block DOM elements [label=-1 (if manualTestPath is not creatred) and 0 otherwise], to be predicted by the trained SVM.
 			indexPageElementsFeatures = getDOMElementsFeatures();
 
-
-
-			//System.out.println(tempListOfelementTagAttAssertions);
-			//System.out.println(tempListOfregionFullAssertions);
-			//System.out.println(tempListOfregionTagAssertions);
-
-			// shuffling the assertions to select a random subset
-			Collections.shuffle(tempListOfelementTagAttAssertions);
-			Collections.shuffle(tempListOfregionFullAssertions);
-			Collections.shuffle(tempListOfregionTagAssertions);
-			Collections.shuffle(tempListOfregionTagAttAssertions);
-
-			//int numberOfRegionFullAssertionsToSelect = 2;
-			//int numberOfElementTagAttAssertionsToSelect = 2;
-			//int numberOfRegionTagAssertionsToSelect = 1;
-
-
-			for (int i=0;i<2;i++)
-				rand1AssertionForState0  += tempListOfelementTagAttAssertions.get(i) + "; // Random element assertion\n";
-			for (int i=0;i<2;i++)
-				rand1AssertionForState0 += tempListOfregionFullAssertions.get(i) + "; // Random region assertion\n";
-			for (int i=0;i<1;i++)
-				rand1AssertionForState0 += tempListOfregionTagAssertions.get(i) + "; // Random region assertion\n";
-
-			for (int i=2;i<4;i++)
-				rand2AssertionForState0  += tempListOfelementTagAttAssertions.get(i) + "; // Random element assertion\n";
-			for (int i=2;i<4;i++)
-				rand2AssertionForState0 += tempListOfregionFullAssertions.get(i) + "; // Random region assertion\n";
-			for (int i=1;i<2;i++)
-				rand2AssertionForState0 += tempListOfregionTagAssertions.get(i) + "; // Random region assertion\n";
-
-			for (int i=4;i<6;i++)
-				rand3AssertionForState0  += tempListOfelementTagAttAssertions.get(i) + "; // Random element assertion\n";
-			for (int i=4;i<6;i++)
-				rand3AssertionForState0 += tempListOfregionFullAssertions.get(i) + "; // Random region assertion\n";
-			for (int i=2;i<3;i++)
-				rand3AssertionForState0 += tempListOfregionTagAssertions.get(i) + "; // Random region assertion\n";
-
-			for (int i=6;i<8;i++)
-				rand4AssertionForState0  += tempListOfelementTagAttAssertions.get(i) + "; // Random element assertion\n";
-			for (int i=6;i<8;i++)
-				rand4AssertionForState0 += tempListOfregionFullAssertions.get(i) + "; // Random region assertion\n";
-			for (int i=3;i<4;i++)
-				rand4AssertionForState0 += tempListOfregionTagAssertions.get(i) + "; // Random region assertion\n";
-
-			for (int i=8;i<10;i++)
-				rand5AssertionForState0  += tempListOfelementTagAttAssertions.get(i) + "; // Random element assertion\n";
-			for (int i=8;i<10;i++)
-				rand5AssertionForState0 += tempListOfregionFullAssertions.get(i) + "; // Random region assertion\n";
-			for (int i=4;i<5;i++)
-				rand5AssertionForState0 += tempListOfregionTagAssertions.get(i) + "; // Random region assertion\n";
-
-			return;
 		}
-
-		if (newState.getId()==0 && loadInitialSFGFromFile == false && loadExtendedSFGFromFile == false){
-			System.out.println("JUST FOR TEST CASE GENERATION");
-			browser = context.getBrowser();
-			try {
-				Object webelementObjs = context.getBrowser().executeJavaScript("return document.getElementsByTagName(\"*\");");
-				ArrayList webelements = (ArrayList) webelementObjs;
-				WebElement webelement = null;
-				for (int i=0;i<webelements.size();i++){
-					webelement  = (WebElement) webelements.get(i);
-					String xpath = getXPath(webelement);
-					Element element = getElementFromXpath(xpath, context.getBrowser());
-					if (element.getTagName().toUpperCase().equals("HTML") || 
-							element.getTagName().toUpperCase().equals("HEAD") ||
-							element.getTagName().toUpperCase().equals("META") ||
-							element.getTagName().toUpperCase().equals("BODY"))
-						continue;
-					//System.out.println("The DOM element is: " + element);		
-					AssertedElementRegion aep = new AssertedElementRegion(element, "", "By.xpath(\"" + xpath + "\")"); // creating an AssertedElementRegion without any assertion text
-					// generate element/region assertions in the form of strings for each DOM element
-					String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
-					String regionTagAssertion =  generateRegionAssertion(aep, "RegionTagMatch").getAssertion();
-					String regionTagAttAssertion =  generateRegionAssertion(aep, "RegionTagAttMatch").getAssertion();
-					String regionFullAssertion =  generateRegionAssertion(aep, "RegionFullMatch").getAssertion();
-
-					tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
-					tempListOfregionTagAssertions.add(regionTagAssertion); 
-					tempListOfregionTagAttAssertions.add(regionTagAttAssertion); 
-					tempListOfregionFullAssertions.add(regionFullAssertion);				
-				}			
-			} catch (XPathExpressionException xe) {
-				LOG.info("XPathExpressionException!");
-				xe.printStackTrace();
-			} catch(Exception e){
-				LOG.info("Could not execute script");
-				e.printStackTrace();
-			}
-		}
+		
 
 		// Adding DOM elements observed in the browser to the new state
 		for (String assertion: tempListOfelementTagAttAssertions)
@@ -2700,7 +2719,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		tempListOfregionTagAssertions.clear();
 		tempListOfregionTagAttAssertions.clear();
 		tempListOfregionFullAssertions.clear();	
-
 
 
 
