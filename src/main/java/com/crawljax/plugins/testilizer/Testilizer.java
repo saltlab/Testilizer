@@ -103,10 +103,9 @@ import com.crawljax.util.XPathHelper;
 import com.google.common.collect.ImmutableList;
 
 /**
- * TestSuiteExtension is Crawljax plugin tool which extends a current Selenium test suite of an Ajax application. 
- * It initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.
+ * Testilizer is a Crawljax plugin tool which utilizes a Selenium test suite of an Ajax application to generate new test cases with assertions.
  **/
-public class TestSuiteExtension implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
+public class Testilizer implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
 PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomChangeNotifierPlugin, OnCloneStateDetectedPlugin{
 
 	/**
@@ -118,9 +117,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	//static String appName = "eshop1";
 	//static String appName = "eshop2";
 
-	//private String testSuiteNameToGenerate = appName + "_EP_new";
-	private String testSuiteNameToGenerate = appName + "_IP";
-	//private String testSuiteNameToGenerate = appName + "_EP_Learned1";
+	private String testSuiteNameToGenerate = appName + "_INIT";
+	//private String testSuiteNameToGenerate = appName + "_EXND";
+	//private String testSuiteNameToGenerate = appName + "_RAND";
 
 	// one should only be true! if two are false then creates sfg files
 	static boolean loadInitialSFGFromFile = true;
@@ -174,7 +173,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 
-	private static final Logger LOG = LoggerFactory.getLogger(TestSuiteExtension.class);
+	private static final Logger LOG = LoggerFactory.getLogger(Testilizer.class);
 
 	CrawljaxConfiguration config = null;
 	private EmbeddedBrowser browser = null;
@@ -193,7 +192,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 
-	public TestSuiteExtension() {
+	public Testilizer() {
 		// TODO: initialization
 		LOG.info("Initialized the TestSuiteExtension plugin");
 	}
