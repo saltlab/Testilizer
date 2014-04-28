@@ -8,10 +8,10 @@
 		<version>3.3-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>testsuiteextension-plugin</artifactId>
+	<artifactId>testilizer</artifactId>
 
-	<name>TestSuiteExtension Plugin</name>
-	<description>TestSuiteExtension is Crawljax plugin tool which extends a current Selenium test suite of an Ajax application. TestSuiteExtension initiates the state-flow graph with Selenium test cases (happy paths) and crawl other paths around those happy paths.</description>
+	<name>Testilizer Plugin</name>
+	<description>Testilizer is a Crawljax plugin tool which utilizes a Selenium test suite of an Ajax application to generate new test cases with assertions.</description>
 	<inceptionYear>2013</inceptionYear>
 
 	<developers>
