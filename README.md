@@ -1,5 +1,5 @@
 Testilizer plugin
 ==================
 
-Testilizer is a Crawljax plugin tool which utilizes a Selenium test suite of an Ajax application to generate new test cases with assertions.
+Testilizer is a tool which utilizes an existing Selenium test suite of a web application to generate new test cases with assertions.
 
