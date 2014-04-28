@@ -109,7 +109,7 @@ public class Testilizer implements PreCrawlingPlugin, OnNewStatePlugin, PreState
 PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomChangeNotifierPlugin, OnCloneStateDetectedPlugin{
 
 	/**
-	 * Settings for my experiments
+	 * Settings for ASE paper experiments
 	 */
 	//static String appName = "claroline";
 	static String appName = "photogallery";
@@ -145,7 +145,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	int randRegionTagAssertions = 0;
 	int randRegionFullAssertions = 0;
 
-	//TODO: Attention! I am now using the same port number for mutations as for the JSCover at this point! Should be changed for the next test suites...
+	//TODO: I am now using the same port number for mutations as for the JSCover at this point! Should be changed for the next test suites...
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
 	// DOM-mutation testing settings
@@ -193,8 +193,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 
 	public Testilizer() {
-		// TODO: initialization
-		LOG.info("Initialized the TestSuiteExtension plugin");
+		LOG.info("Initialized the Testilizer plugin");
 	}
 
 
@@ -203,7 +202,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 */
 	@Override
 	public void preCrawling(CrawljaxConfiguration config) {
-		LOG.info("TestSuiteExtension plugin started");
+		LOG.info("Testilizer plugin started");
 
 		// Bypassing instrumenting and getting exec trace if already done
 		if(true)
@@ -218,9 +217,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		String originalFolderLoc = System.getProperty("user.dir");
 		// On Linux/Mac
-		originalFolderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/originaltests/";
+		originalFolderLoc += "/src/main/java/com/crawljax/plugins/Testilizer/casestudies/" + appName + "/originaltests/";
 		// On Windows
-		//originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\originaltests\\";
+		//originalFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\Testilizer\\casestudies\\" + appName +"\\originaltests\\";
 
 		File originalFolder = new File(originalFolderLoc);
 		LOG.info("originalFolderLoc: {} " , originalFolderLoc);
@@ -246,9 +245,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		 */
 		String instrumentedFolderLoc = System.getProperty("user.dir");
 		// On Linux/Mac
-		instrumentedFolderLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/instrumentedtests/";
+		instrumentedFolderLoc += "/src/main/java/com/crawljax/plugins/Testilizer/casestudies/" + appName + "/instrumentedtests/";
 		// On Windows
-		//instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\instrumentedtests\\";
+		//instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\Testilizer\\casestudies\\" + appName +"\\instrumentedtests\\";
 
 		File instrumentedFolder = new File(instrumentedFolderLoc);
 		LOG.info("instrumentedFolderLoc: {}" , instrumentedFolderLoc);
@@ -317,7 +316,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	public static void executeUnitTest(String test) {
 		try {
-			String fileName = "com.crawljax.plugins.testsuiteextension." + getFileFullName(test);
+			String fileName = "com.crawljax.plugins.Testilizer." + getFileFullName(test);
 			System.out.println("Executing test class: " + fileName);
 			Class<?> forName = Class.forName(fileName);
 			JUnitCore.runClasses(forName);
@@ -328,9 +327,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	public static String getFileFullName(String file) {
 		file = file.replace(System.getProperty("user.dir"), "");
-		file = file.replace("/src/main/java/com/crawljax/plugins/testsuiteextension/", "");
+		file = file.replace("/src/main/java/com/crawljax/plugins/Testilizer/", "");
 		// handling windows format
-		file = file.replace("\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\", "");
+		file = file.replace("\\src\\main\\java\\com\\crawljax\\plugins\\Testilizer\\", "");
 		file = (file.contains(".")) ? file.substring(0, file.indexOf(".")) : file;
 		file = file.replace("/", ".");
 		file = file.replace("\\", ".");
@@ -978,7 +977,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			out = new ObjectOutputStream(fos);
 			out.writeObject(sfg);
 			out.close();
-			LOG.info("TestSuiteExtension successfully wrote SFG to sfg_init.ser file");
+			LOG.info("Testilizer successfully wrote SFG to sfg_init.ser file");
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
@@ -1001,7 +1000,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			out = new ObjectOutputStream(fos);
 			out.writeObject(sfg);
 			out.close();
-			LOG.info("TestSuiteExtension successfully wrote SFG to sfg_extend.ser file");
+			LOG.info("Testilizer successfully wrote SFG to sfg_extend.ser file");
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
@@ -1423,7 +1422,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 		LOG.info("#transitions in the final SFG: " + sfg.getAllEdges().size());	
 
 
-		LOG.info("TestSuiteExtension plugin has finished");
+		LOG.info("Testilizer plugin has finished");
 	}
 
 	// Training the SVM
@@ -2349,9 +2348,9 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				// adding the test method to the file
 				testMethods.add(testMethod);
 
-				String packagename = "com.crawljax.plugins.testsuiteextension.generated." + testSuiteNameToGenerate;
+				String packagename = "com.crawljax.plugins.Testilizer.generated." + testSuiteNameToGenerate;
 
-				String TEST_SUITE_PATH = "src/test/java/com/crawljax/plugins/testsuiteextension/generated/" + testSuiteNameToGenerate;
+				String TEST_SUITE_PATH = "src/test/java/com/crawljax/plugins/Testilizer/generated/" + testSuiteNameToGenerate;
 
 				String CLASS_NAME = "GeneratedTestCase"+ Integer.toString(counter);
 				String FILE_NAME_TEMPLATE = "TestCase.vm";
@@ -2437,7 +2436,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 	@Override
 	public String toString() {
-		return "TestSuiteExtension plugin";
+		return "Testilizer plugin";
 	}
 
 	@Override
