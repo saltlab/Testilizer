@@ -112,7 +112,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	 * Settings for ASE paper experiments
 	 */
 	//static String appName = "claroline";
-	static String appName = "photogallery";
+	public static String appName = "photogallery";
 	//static String appName = "wolfcms";
 	//static String appName = "eshop1";
 	//static String appName = "eshop2";

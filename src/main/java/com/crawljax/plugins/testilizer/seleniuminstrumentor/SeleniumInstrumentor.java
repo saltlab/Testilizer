@@ -49,6 +49,7 @@ import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.crawljax.plugins.testilizer.Testilizer;
 import com.crawljax.plugins.testilizer.utils.CompilationUnitUtils;
 
 
@@ -58,11 +59,6 @@ public class SeleniumInstrumentor {
 
 	public static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
 
-	//String appName = "claroline";
-	//String appName = "photogallery";
-	String appName = "wolfcms";
-
-	
 	public SeleniumInstrumentor() {
 	}
 
@@ -72,7 +68,7 @@ public class SeleniumInstrumentor {
 		instrument(file, true);
 	}
 
-	
+
 	/**
 	 * The pattern to be saved in the log file is as following:
 	 * 
@@ -111,7 +107,7 @@ public class SeleniumInstrumentor {
 				//for (MethodCallExpr mce2 : methodCalls2)
 				//	System.out.println(mce2);
 
-				
+
 				// add a body to the method
 				BlockStmt block = new BlockStmt();
 
@@ -130,51 +126,51 @@ public class SeleniumInstrumentor {
 					for (MethodCallExpr mce : methodCalls) {
 						if (stmt.toString().contains(mce.toString())){
 							Statement inject = null;
-							
+
 							System.out.println("mce: " + mce);
-							
+
 							//	Instrumenting assertions...
 
 							if (mce.getName().equals("assertTrue") || mce.getName().equals("assertEquals") || mce.getName().equals("assertNotNull") || mce.getName().equals("assertNull")){
-								String codeToInstrumentOn = "com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.assertionModeOn";
-								String codeToInstrumentOff = "com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.assertionModeOff";
+								String codeToInstrumentOn = "com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.assertionModeOn";
+								String codeToInstrumentOff = "com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.assertionModeOff";
 								MethodCallExpr callOn = new MethodCallExpr(null, codeToInstrumentOn);
 								MethodCallExpr callOff = new MethodCallExpr(null, codeToInstrumentOff);
 
 								Statement PreStmt = new ExpressionStmt(callOn);
 								Statement Poststmt = new ExpressionStmt(callOff);
-								
+
 								ASTHelper.addStmt(block, PreStmt);
 								ASTHelper.addStmt(block, stmt);
 
 								String instrumentableString = makeInstrumentableString(mce.toString());
-								inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+								inject = JavaParser.parseStatement("com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
 								ASTHelper.addStmt(block, inject);
 
 								ASTHelper.addStmt(block, Poststmt);
 								inject = null;	// set inject back to null to prevent redundant injection
-																
+
 								//String instrumentableString = makeInstrumentableString(mce.toString());
-								//inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
-								//System.out.println("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+								//inject = JavaParser.parseStatement("com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
+								//System.out.println("com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getAssertion(\"" + instrumentableString +"\");");
 							}
-							
+
 							if (mce.getName().equals("clear") || mce.getName().equals("click") || mce.getName().equals("sendKeys")){
 								// instrument with a new code
 								List<Expression> args = mce.getArgs();
 								Expression scope = mce.getScope();
 								if (args==null){
-									System.out.println("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", \"\")." + mce.getName() + "();");
-									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", \"\")." + mce.getName() + "();");
-							        // e.g., com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement(driver.findElement(By.id("login")), "clear", "").clear();
+									System.out.println("com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", \"\")." + mce.getName() + "();");
+									inject = JavaParser.parseStatement("com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", \"\")." + mce.getName() + "();");
+									// e.g., com.crawljax.plugins.testilizer.instrumentor.SeleniumInstrumentor.getWebElement(driver.findElement(By.id("login")), "clear", "").clear();
 
 								}else{
-									System.out.println("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
-									inject = JavaParser.parseStatement("com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
-									// e.g., com.crawljax.plugins.testsuiteextension.instrumentor.SeleniumInstrumentor.getWebElement(driver.findElement(By.id("login")), "sendKeys", "nainy").sendKeys("nainy");
+									System.out.println("com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName() + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
+									inject = JavaParser.parseStatement("com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getWebElement("+ scope.toString() +", \"" + mce.getName()  + "\", " + args.get(0) + ")." + mce.getName() + "(" + args.get(0) + ");");
+									// e.g., com.crawljax.plugins.testilizer.instrumentor.SeleniumInstrumentor.getWebElement(driver.findElement(By.id("login")), "sendKeys", "nainy").sendKeys("nainy");
 								}
 							}
-							
+
 							if (inject!=null)
 								ASTHelper.addStmt(block, inject);
 						}
@@ -183,7 +179,7 @@ public class SeleniumInstrumentor {
 				testCaseMethod.setBody(block);
 			}
 
-		
+
 			HashMap<MethodDeclaration, ArrayList<MethodCallExpr>> methodCalls = tcp.getSeleniumDomRelateMethodCallExpressions(cu);
 
 			for (MethodDeclaration e : methodCalls.keySet()) {
@@ -195,31 +191,23 @@ public class SeleniumInstrumentor {
 					System.out.println("mce: " + mce);
 				}
 			}				
-		
-			if (writeBack == true){
 
-				
+			if (writeBack == true){
 				String newFileLoc = System.getProperty("user.dir");
 				// On Linux/Mac			
-				newFileLoc += "/src/main/java/com/crawljax/plugins/testsuiteextension/casestudies/" + appName + "/instrumentedtests/";
+				newFileLoc += "/src/main/java/com/crawljax/plugins/testilizer/casestudies/" + Testilizer.appName + "/instrumentedtests/";
 				// On Windows
-				//instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testsuiteextension\\casestudies\\" + appName +"\\instrumentedtests\\";
+				//instrumentedFolderLoc += "\\src\\main\\java\\com\\crawljax\\plugins\\testilizer\\casestudies\\" + appName +"\\instrumentedtests\\";
 				FileOutputStream newFile = new FileOutputStream(newFileLoc+file.getName());
-				cu.setPackage(new PackageDeclaration(new NameExpr("com.crawljax.plugins.testsuiteextension.casestudies." + appName + ".instrumentedtests")));
+				cu.setPackage(new PackageDeclaration(new NameExpr("com.crawljax.plugins.testilizer.casestudies." + Testilizer.appName + ".instrumentedtests")));
 				CompilationUnitUtils.writeCompilationUnitToFile(cu, newFileLoc+file.getName(), false);
 
 				LOG.info("done writing");
 			}
 
-		} catch (FileNotFoundException e1) {
+		} catch (Exception e) {
 			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} catch (ParseException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			e.printStackTrace();
 		}
 	}
 
@@ -239,20 +227,20 @@ public class SeleniumInstrumentor {
 		// create a methodcall expre
 		String codeToInstrument = null;
 		String methodCallName = mce.getName();
-		
+
 		System.out.println("mce.getName(): " + mce.getName());
-		
+
 		// logging the values
 		switch(mce.getName()){
 		case "findElement":
-			codeToInstrument = "com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getBy";
+			codeToInstrument = "com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getBy";
 			break;
-		//case "sendKeys":
-		//	codeToInstrument = "com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor.getInput";
-		//	break;
-		//case "clear":
-		//	System.out.println("CLEAR:");
-		//	break;
+			//case "sendKeys":
+			//	codeToInstrument = "com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor.getInput";
+			//	break;
+			//case "clear":
+			//	System.out.println("CLEAR:");
+			//	break;
 		}
 
 		if (codeToInstrument!=null){
@@ -285,17 +273,17 @@ public class SeleniumInstrumentor {
 		writeToSeleniumExecutionTrace("assertion " + assertionStatement);
 	}
 
-	
+
 	public static void assertionModeOn() {
 		writeToSeleniumExecutionTrace("assertionModeOn");
 		System.out.println("assertionModeOn");
 	}
-	
+
 	public static void assertionModeOff() {
 		writeToSeleniumExecutionTrace("assertionModeOff");
 		System.out.println("assertionModeOff");
 	}	
-	
+
 	public static WebElement getWebElement(WebElement webElement, String method, String args) {
 		System.out.println("Performing " + method + " on: " + webElement);
 		writeToSeleniumExecutionTrace(webElement.toString());
@@ -309,7 +297,7 @@ public class SeleniumInstrumentor {
 		writeToSeleniumExecutionTrace("Alert");
 		return alert;
 	}
-	
+
 	public static synchronized void writeToSeleniumExecutionTrace(String string) {
 		try {
 			FileWriter fw = new FileWriter(seleniumExecutionTrace, true); //appending new data
@@ -321,7 +309,7 @@ public class SeleniumInstrumentor {
 		}
 	}
 
-	
+
 	public static ArrayList<String> readFromSeleniumExecutionTrace() {
 		ArrayList<String> content = new ArrayList<String>();
 		try {
