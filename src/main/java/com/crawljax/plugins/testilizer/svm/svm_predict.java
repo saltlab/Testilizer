@@ -1,4 +1,4 @@
-package com.crawljax.plugins.testsuiteextension.svm;
+package com.crawljax.plugins.testilizer.svm;
 import libsvm.*;
 import java.io.*;
 import java.util.*;

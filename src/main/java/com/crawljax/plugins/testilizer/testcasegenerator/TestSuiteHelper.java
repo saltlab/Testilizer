@@ -1,4 +1,4 @@
-package com.crawljax.plugins.testsuiteextension.testcasegenerator;
+package com.crawljax.plugins.testilizer.testcasegenerator;
 
 import java.net.URL;
 import java.util.ArrayList;

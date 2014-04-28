@@ -1,4 +1,4 @@
-package com.crawljax.plugins.testsuiteextension;
+package com.crawljax.plugins.testilizer;
 
 
 import static org.junit.Assert.assertEquals;
@@ -89,12 +89,11 @@ import com.crawljax.core.state.Eventable.EventType;
 import com.crawljax.core.state.Identification.How;
 import com.crawljax.forms.FormInput;
 import com.crawljax.forms.RandomInputValueGenerator;
-import com.crawljax.plugins.testsuiteextension.jsinstrumentor.JSModifyProxyPlugin;
-import com.crawljax.plugins.testsuiteextension.seleniuminstrumentor.SeleniumInstrumentor;
-import com.crawljax.plugins.testsuiteextension.svm.svm_predict;
-import com.crawljax.plugins.testsuiteextension.svm.svm_train;
-import com.crawljax.plugins.testsuiteextension.testcasegenerator.JavaTestGenerator;
-import com.crawljax.plugins.testsuiteextension.testcasegenerator.TestMethod;
+import com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor;
+import com.crawljax.plugins.testilizer.svm.svm_predict;
+import com.crawljax.plugins.testilizer.svm.svm_train;
+import com.crawljax.plugins.testilizer.testcasegenerator.JavaTestGenerator;
+import com.crawljax.plugins.testilizer.testcasegenerator.TestMethod;
 import com.crawljax.util.AssertedElementRegion;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
@@ -119,20 +118,21 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 	//static String appName = "eshop1";
 	//static String appName = "eshop2";
 
-	private String testSuiteNameToGenerate = appName + "_EP";
+	//private String testSuiteNameToGenerate = appName + "_EP_new";
+	private String testSuiteNameToGenerate = appName + "_IP";
 	//private String testSuiteNameToGenerate = appName + "_EP_Learned1";
 
 	// one should only be true! if two are false then creates sfg files
-	static boolean loadInitialSFGFromFile = false;
-	static boolean loadExtendedSFGFromFile = true;
+	static boolean loadInitialSFGFromFile = true;
+	static boolean loadExtendedSFGFromFile = false;
 
 	static boolean saveNewTrainingDatasetToFile = false;
 
-	static boolean addAllAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addOriginalAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addLearnedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addAllAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addOriginalAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addReusedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addGeneratedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addLearnedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	// this is to create a baseline for comparison reasons -> generating random assertions on the page.	static boolean randomAssertionGeneration = false;  
 	static boolean addRandomAssertions = true; // getting code coverage by JSCover tool proxy (default should be false)
@@ -660,7 +660,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		CrawlSession session = firstConsumer.getContext().getSession();
 
-		saveInitialSFG(session);
+		if (!appName.equals("claroline"))
+			saveInitialSFG(session);
 
 	}
 
@@ -1267,7 +1268,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			sfg = loadExtendedSFG();
 		else{
 			sfg = session.getStateFlowGraph();
-			saveExtendedSFG(session);
+			if (!appName.equals("claroline"))
+				saveExtendedSFG(session);
 		}
 
 		for (StateVertex s: sfg.getAllStates()){
@@ -1766,6 +1768,7 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 					/* Adding 5 random assertions */
 					if (addRandomAssertions==true){
+						
 						// applying randomized assertion generation
 						randomAssertionsPool.clear();
 						// shuffling the assertions to select a random subset
@@ -2542,10 +2545,14 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				String regionTagAttAssertion =  generateRegionAssertion(aep, "RegionTagAttMatch").getAssertion();
 				String regionFullAssertion =  generateRegionAssertion(aep, "RegionFullMatch").getAssertion();
 
-				tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
-				tempListOfregionTagAssertions.add(regionTagAssertion); 
-				tempListOfregionTagAttAssertions.add(regionTagAttAssertion); 
-				tempListOfregionFullAssertions.add(regionFullAssertion);				
+				if (elementTagAttAssertion.length()<4000)
+					tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
+				if (regionTagAssertion.length()<4000)
+					tempListOfregionTagAssertions.add(regionTagAssertion); 
+				if (regionTagAttAssertion.length()<4000)
+					tempListOfregionTagAttAssertions.add(regionTagAttAssertion); 
+				if (regionFullAssertion.length()<4000)
+					tempListOfregionFullAssertions.add(regionFullAssertion);				
 			}
 
 
@@ -2625,6 +2632,8 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 
 		if (newState.getId()==0){
 
+			//if (true) return;
+
 			System.out.println("Adding index page features and random ");
 
 			browser = context.getBrowser();
@@ -2684,11 +2693,35 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 					String regionTagAttAssertion =  generateRegionAssertion(aep, "RegionTagAttMatch").getAssertion();
 					String regionFullAssertion =  generateRegionAssertion(aep, "RegionFullMatch").getAssertion();
 
-					tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
-					tempListOfregionTagAssertions.add(regionTagAssertion); 
-					tempListOfregionTagAttAssertions.add(regionTagAttAssertion); 
-					tempListOfregionFullAssertions.add(regionFullAssertion);				
-				}			
+					if (elementTagAttAssertion.length()<4000)
+						tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
+					if (regionTagAssertion.length()<4000)
+						tempListOfregionTagAssertions.add(regionTagAssertion); 
+					if (regionTagAttAssertion.length()<4000)
+						tempListOfregionTagAttAssertions.add(regionTagAttAssertion); 
+					if (regionFullAssertion.length()<4000)
+						tempListOfregionFullAssertions.add(regionFullAssertion);	
+				}
+				
+				
+				// Adding DOM elements observed in the browser to the new state
+				for (String assertion: tempListOfelementTagAttAssertions)
+					newState.addElementTagAttAssertion(assertion);
+				for (String assertion: tempListOfregionTagAssertions)
+					newState.addRegionTagAssertion(assertion);
+				for (String assertion: tempListOfregionTagAttAssertions)
+					newState.addRegionTagAttAssertion(assertion);
+				for (String assertion: tempListOfregionFullAssertions)
+					newState.addRegionFullAssertion(assertion);
+
+				// Emptying the temp lists
+				tempListOfelementTagAttAssertions.clear();
+				tempListOfregionTagAssertions.clear();
+				tempListOfregionTagAttAssertions.clear();
+				tempListOfregionFullAssertions.clear();	
+			
+				
+				
 			} catch (XPathExpressionException xe) {
 				LOG.info("XPathExpressionException!");
 				xe.printStackTrace();
@@ -2701,8 +2734,12 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 			// Getting feature vector of block DOM elements [label=-1 (if manualTestPath is not creatred) and 0 otherwise], to be predicted by the trained SVM.
 			indexPageElementsFeatures = getDOMElementsFeatures();
 
+			return;
 		}
-		
+
+
+		if (browser.getCurrentUrl().equals("http://localhost:8888/claroline-1.11.7/index.php?logout=true"))
+			return;
 
 		// Adding DOM elements observed in the browser to the new state
 		for (String assertion: tempListOfelementTagAttAssertions)
@@ -2790,35 +2827,6 @@ PostCrawlingPlugin, OnUrlLoadPlugin, OnFireEventSucceededPlugin, ExecuteInitialP
 				countList.set(i,countList.get(i)+((Long)c.get(i)).intValue());
 			JSCountList.put(modifiedJS, countList);
 		}
-	}
-
-	// Compute code coverage
-	public double getCoverage(){
-
-		double coverage = 0.0;
-		int totalExecutedLines = 0, totalLines = 0;
-
-		for (String modifiedJS : JSModifyProxyPlugin.getModifiedJSList()){
-			if (JSCountList.containsKey(modifiedJS)){
-				totalLines += JSCountList.get(modifiedJS).size();
-				int executedLines = 0;
-
-				LOG.info(" List of " + modifiedJS + " is: " + JSCountList.get(modifiedJS));
-
-				for (int i: JSCountList.get(modifiedJS))
-					if (i>0){
-						totalExecutedLines++;
-						executedLines++;
-					}
-
-				LOG.info("List of " + modifiedJS + " # lines ececuted: " + executedLines + " # tolal lines: " + JSCountList.get(modifiedJS).size() + " - code coverage: " + (double)executedLines/(double)JSCountList.get(modifiedJS).size()*100+"%\n");
-			}
-		}
-
-		coverage = (double)totalExecutedLines/(double)totalLines;
-
-		LOG.info("Code coverage: " + coverage*100+"%");
-		return coverage;
 	}
 
 

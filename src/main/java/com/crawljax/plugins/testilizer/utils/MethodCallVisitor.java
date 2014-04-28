@@ -1,4 +1,4 @@
-package com.crawljax.plugins.testsuiteextension.utils;
+package com.crawljax.plugins.testilizer.utils;
 
 import java.nio.file.WatchEvent.Modifier;
 import java.util.ArrayList;

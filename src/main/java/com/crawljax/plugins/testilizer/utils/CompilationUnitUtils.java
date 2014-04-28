@@ -1,4 +1,4 @@
-package com.crawljax.plugins.testsuiteextension.utils;
+package com.crawljax.plugins.testilizer.utils;
 
 import japa.parser.ast.CompilationUnit;
 import japa.parser.ast.body.BodyDeclaration;
