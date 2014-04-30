@@ -117,7 +117,8 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 	//static String appName = "eshop1";
 	//static String appName = "eshop2";
 
-	private String testSuiteNameToGenerate = appName + "_INIT";
+	private String testSuiteNameToGenerate = appName;
+	//private String testSuiteNameToGenerate = appName + "_INIT";
 	//private String testSuiteNameToGenerate = appName + "_EXND";
 	//private String testSuiteNameToGenerate = appName + "_RAND";
 
@@ -132,11 +133,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 	static boolean saveNewTrainingDatasetToFile = false;
 
-	static boolean addAllAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addOriginalAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addReusedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addGeneratedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
-	static boolean addLearnedAssertions = false; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addAllAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addOriginalAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addReusedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addGeneratedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
+	static boolean addLearnedAssertions = true; // setting for experiment on DOM-based assertion generation part (default should be true)
 
 	// this is to create a baseline for comparison reasons -> generating random assertions on the page.	static boolean randomAssertionGeneration = false;  
 	static boolean addRandomAssertions = true; // getting code coverage by JSCover tool proxy (default should be false)
@@ -2212,9 +2213,9 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 				// adding the test method to the file
 				testMethods.add(testMethod);
 
-				String packagename = "com.crawljax.plugins.Testilizer.generated." + testSuiteNameToGenerate;
+				String packagename = "com.crawljax.plugins.testilizer.generated." + testSuiteNameToGenerate;
 
-				String TEST_SUITE_PATH = "src/test/java/com/crawljax/plugins/Testilizer/generated/" + testSuiteNameToGenerate;
+				String TEST_SUITE_PATH = "src/test/java/com/crawljax/plugins/testilizer/generated/" + testSuiteNameToGenerate;
 
 				String CLASS_NAME = "GeneratedTestCase"+ Integer.toString(counter);
 				String FILE_NAME_TEMPLATE = "TestCase.vm";
