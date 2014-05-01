@@ -103,33 +103,32 @@ import com.crawljax.util.XPathHelper;
 import com.google.common.collect.ImmutableList;
 
 /**
- * Testilizer is a Crawljax plugin tool which utilizes a Selenium test suite of an Ajax application to generate new test cases with assertions.
+ * Testilizer is a tool which utilizes an existing Selenium test suite of a web application to generate new test cases with assertions.
  **/
 public class Testilizer implements PreCrawlingPlugin, OnNewStatePlugin, PreStateCrawlingPlugin,
 PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomChangeNotifierPlugin, OnCloneStateDetectedPlugin{
 
 	/**
-	 * Settings for ASE paper experiments
+	 * Settings for our ASE paper experiments
 	 */
 	//static String appName = "claroline";
 	public static String appName = "photogallery";
 	//static String appName = "wolfcms";
-	//static String appName = "eshop1";
-	//static String appName = "eshop2";
+	//static String appName = "estore1";
+	//static String appName = "estore2";
 
 	private String testSuiteNameToGenerate = appName;
 	//private String testSuiteNameToGenerate = appName + "_INIT";
 	//private String testSuiteNameToGenerate = appName + "_EXND";
 	//private String testSuiteNameToGenerate = appName + "_RAND";
 
-	
-	// Bypassing test suite instrumentation and generating test operation dataset if already done, should be "false" by default
+	// Bypassing preCrawling phase which instruments and executes the test suite to generate test operation dataset
+	// Should be set to "true" if the dataset is already created, otherwise set to "false" by default
 	Boolean bypassPreCrawling = true;
 	
-	
 	// one should only be true! if two are false then creates sfg files
-	static boolean loadInitialSFGFromFile = true;
-	static boolean loadExtendedSFGFromFile = false;
+	static boolean loadInitialSFGFromFile = false;
+	static boolean loadExtendedSFGFromFile = true;
 
 	static boolean saveNewTrainingDatasetToFile = false;
 
@@ -151,7 +150,6 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 	int randRegionTagAssertions = 0;
 	int randRegionFullAssertions = 0;
 
-	//TODO: I am now using the same port number for mutations as for the JSCover at this point! Should be changed for the next test suites...
 	static boolean getCoverageReport = false; // getting code coverage by JSCover tool proxy (default should be false)
 
 	// DOM-mutation testing settings
@@ -177,8 +175,6 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 	boolean manualTestPathsCreated = false;
 
 
-
-
 	private static final Logger LOG = LoggerFactory.getLogger(Testilizer.class);
 
 	CrawljaxConfiguration config = null;
@@ -188,14 +184,12 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 	private boolean inAssertionMode = false;
 
-	// Keeping track of executed lines of a JavaScript code for Feedex	
+	// Keeping track of executed lines of a JavaScript code if using Feedex for exploration	
 	private Map<String,ArrayList<Integer>> JSCountList = new Hashtable<String,ArrayList<Integer>>(); 
 
 	private String finalReport ="";
 
-
 	private ArrayList<ElementFeatures> indexPageElementsFeatures;
-
 
 
 	public Testilizer() {
@@ -466,7 +460,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 						inputValue = "RND" + new RandomInputValueGenerator().getRandomString(4) + "@example.com";
 						System.out.println("Random string " + inputValue + " generated for inputValue");
 					}
-					if (inputValue.equals("$RandValue.com")){  // Only the case for eshop app for unique domain address
+					if (inputValue.equals("$RandValue.com")){  // Only the case for estore app for unique domain address
 						inputValue = "RND" + new RandomInputValueGenerator().getRandomString(4) + ".com";
 						System.out.println("Random string " + inputValue + " generated for inputValue");
 					}
