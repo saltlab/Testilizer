@@ -57,7 +57,7 @@ public class SeleniumInstrumentor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(SeleniumInstrumentor.class);
 
-	public static String seleniumExecutionTrace = "SeleniumExecutionTrace.txt";
+	public static String seleniumTestOperationDataset = "TestOperationDataset.txt";
 
 	public SeleniumInstrumentor() {
 	}
@@ -257,50 +257,50 @@ public class SeleniumInstrumentor {
 
 
 	public static By getBy(By by) {
-		writeToSeleniumExecutionTrace(by.toString());
+		writeToTestOperationsDataset(by.toString());
 		System.out.println(by.toString());
 		return by;
 	}
 
 	public static String getInput(String input) {
-		writeToSeleniumExecutionTrace("sendKeys: " + input);
+		writeToTestOperationsDataset("sendKeys: " + input);
 		System.out.println("sendKeys: " + input);
 		return input;
 	}	
 
 	public static void getAssertion(String assertionStatement) {
 		// extracting assertion to be used
-		writeToSeleniumExecutionTrace("assertion " + assertionStatement);
+		writeToTestOperationsDataset("assertion " + assertionStatement);
 	}
 
 
 	public static void assertionModeOn() {
-		writeToSeleniumExecutionTrace("assertionModeOn");
+		writeToTestOperationsDataset("assertionModeOn");
 		System.out.println("assertionModeOn");
 	}
 
 	public static void assertionModeOff() {
-		writeToSeleniumExecutionTrace("assertionModeOff");
+		writeToTestOperationsDataset("assertionModeOff");
 		System.out.println("assertionModeOff");
 	}	
 
 	public static WebElement getWebElement(WebElement webElement, String method, String args) {
 		System.out.println("Performing " + method + " on: " + webElement);
-		writeToSeleniumExecutionTrace(webElement.toString());
-		writeToSeleniumExecutionTrace(method + " " + args);
+		writeToTestOperationsDataset(webElement.toString());
+		writeToTestOperationsDataset(method + " " + args);
 		return webElement;
 	}	
 
 	public static Alert getAlert(Alert alert, String action) {
 		System.out.println("Performing " + action + " on alert");
-		//writeToSeleniumExecutionTrace("Alert " + action);
-		writeToSeleniumExecutionTrace("Alert");
+		//writeToTestOperationsDataset("Alert " + action);
+		writeToTestOperationsDataset("Alert");
 		return alert;
 	}
 
-	public static synchronized void writeToSeleniumExecutionTrace(String string) {
+	public static synchronized void writeToTestOperationsDataset(String string) {
 		try {
-			FileWriter fw = new FileWriter(seleniumExecutionTrace, true); //appending new data
+			FileWriter fw = new FileWriter(seleniumTestOperationDataset, true); //appending new data
 			fw.write(string + "\n");
 			fw.close();
 		} catch (IOException e) {
@@ -310,10 +310,10 @@ public class SeleniumInstrumentor {
 	}
 
 
-	public static ArrayList<String> readFromSeleniumExecutionTrace() {
+	public static ArrayList<String> readFromTestOperationsDataset() {
 		ArrayList<String> content = new ArrayList<String>();
 		try {
-			FileReader fileReader = new FileReader(new File(seleniumExecutionTrace));
+			FileReader fileReader = new FileReader(new File(seleniumTestOperationDataset));
 			BufferedReader bufferedReader = new BufferedReader(fileReader);
 			String line;
 			while ((line = bufferedReader.readLine()) != null) {

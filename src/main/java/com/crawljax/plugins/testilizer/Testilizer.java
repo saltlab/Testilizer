@@ -123,7 +123,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 	//private String testSuiteNameToGenerate = appName + "_RAND";
 
 	
-	// Bypassing test suite instrumentation and generating exec trace if already done, should be "false" by default
+	// Bypassing test suite instrumentation and generating test operation dataset if already done, should be "false" by default
 	Boolean bypassPreCrawling = true;
 	
 	
@@ -204,13 +204,13 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 
 	/**
-	 * Instrumenting Selenium test suite to get the execution trace
+	 * Instrumenting Selenium test suite to get the test operation dataset
 	 */
 	@Override
 	public void preCrawling(CrawljaxConfiguration config) {
 		LOG.info("Testilizer plugin started");
 
-		// Bypassing instrumenting and getting exec trace if already done
+		// Bypassing instrumenting and getting test operations if already done
 		if(bypassPreCrawling)
 			return;
 
@@ -287,10 +287,10 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		
 
 		if(success){
-			// Executing the instrumented unit test files. This will produce a log of the execution trace
-			LOG.info("Instrumenting unit test files and logging the execution trace...");
+			// Executing the instrumented unit test files. This will produce a test operation dataset
+			LOG.info("Instrumenting unit test files and producing the test operations dataset...");
 
-			SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteBegin");
+			SeleniumInstrumentor.writeToTestOperationsDataset("TestSuiteBegin");
 
 			for (File file : listOfInstrumentedFiles) {
 				if (file.isFile()) {
@@ -298,14 +298,14 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 					System.out.println("Executing unit test in " + file.getAbsolutePath());
 					LOG.info("Executing unit test in {}", file.getName());
 
-					SeleniumInstrumentor.writeToSeleniumExecutionTrace("NewTestCase " + file.getName());
+					SeleniumInstrumentor.writeToTestOperationsDataset("NewTestCase " + file.getName());
 
 					executeUnitTest(file.getAbsolutePath());
 				}
 			}
 		}
 
-		SeleniumInstrumentor.writeToSeleniumExecutionTrace("TestSuiteEnd");
+		SeleniumInstrumentor.writeToTestOperationsDataset("TestSuiteEnd");
 
 	}
 
@@ -354,7 +354,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		WebElement webElement = null;
 		Eventable event = null;
 
-		ArrayList<String> trace = SeleniumInstrumentor.readFromSeleniumExecutionTrace();
+		ArrayList<String> dataset = SeleniumInstrumentor.readFromTestOperationsDataset();
 
 		CopyOnWriteArrayList<FormInput> relatedFormInputs = new CopyOnWriteArrayList<FormInput>();
 
@@ -362,7 +362,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		String howValue = null;
 		String elementLocator = null;
 
-		for (String st: trace){
+		for (String st: dataset){
 			// read the value such as id, cssSelector, xpath, and etc. 
 			ArrayList<String> methodValue = new ArrayList<String>();
 
