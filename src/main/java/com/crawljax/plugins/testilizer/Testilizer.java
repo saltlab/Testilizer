@@ -94,7 +94,7 @@ import com.crawljax.plugins.testilizer.svm.svm_predict;
 import com.crawljax.plugins.testilizer.svm.svm_train;
 import com.crawljax.plugins.testilizer.testcasegenerator.JavaTestGenerator;
 import com.crawljax.plugins.testilizer.testcasegenerator.TestMethod;
-import com.crawljax.util.AssertedElementRegion;
+import com.crawljax.util.CheckedElementRegion;
 //import com.crawljax.plugins.jsmodify.AstInstrumenter;
 //import com.crawljax.plugins.jsmodify.JSModifyProxyPlugin;
 import com.crawljax.util.DomUtils;
@@ -180,7 +180,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 	CrawljaxConfiguration config = null;
 	private EmbeddedBrowser browser = null;
 
-	private ArrayList<AssertedElementRegion> originalAssertedElementRegions = new ArrayList<AssertedElementRegion>();
+	private ArrayList<CheckedElementRegion> originalCheckedElementRegions = new ArrayList<CheckedElementRegion>();
 
 	private boolean inAssertionMode = false;
 
@@ -549,7 +549,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 					break;
 				case "assertion":
 
-					org.w3c.dom.Element assertedSourceElement = null;
+					org.w3c.dom.Element checkedElement = null;
 					String assertion = methodValue.get(1);
 
 					// only for assertions that access a DOM element
@@ -563,16 +563,16 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 						//System.out.println("webElement:" + webElement);
 
 						try {
-							assertedSourceElement = getElementFromXpath(xpath, browser);
-							System.out.println("The assertedSourceElement is: " + assertedSourceElement);
+							checkedElement = getElementFromXpath(xpath, browser);
+							System.out.println("The checkedElement is: " + checkedElement);
 						} catch (XPathExpressionException e) {
 							System.out.println("XPathExpressionException!");
 							e.printStackTrace();
 						}
 
-						// Generate feature vector of the asserted element with label +1 and add to dataset file to be used for training the SVM
-						//addToTrainingSet(getAssertedElemFeatureVector(webElement));
-						ElementFeatures ef = getAssertedElemFeatureVector(webElement);
+						// Generate feature vector of the checked element with label +1 and add to dataset file to be used for training the SVM
+						//addToTrainingSet(getCheckedElemFeatureVector(webElement));
+						ElementFeatures ef = getCheckedElemFeatureVector(webElement);
 
 						boolean elementExist = false;
 						for (ElementFeatures currentEF : trainingPositiveSetElementFeatures){
@@ -591,14 +591,14 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 					}
 
 					// to distinguish original assertions from reused/generated ones
-					AssertedElementRegion aep = new AssertedElementRegion(assertedSourceElement, assertion, elementLocator);
-					aep.setAssertionOrigin("original assertion");
+					CheckedElementRegion cer = new CheckedElementRegion(checkedElement, assertion, elementLocator);
+					cer.setAssertionOrigin("original assertion");
 					// adding assertion to the current DOM state in the SFG
 					StateVertex currentState = firstConsumer.getContext().getCurrentState();
-					boolean assertionAdded = currentState.addAssertedElementRegion(aep);
-					// adding an AssertedElemetRegion-level assertion for the original assertion
+					boolean assertionAdded = currentState.addCheckedElementRegion(cer);
+					// adding a checkedElemetRegion-level assertion for the original assertion
 					if (assertionAdded)
-						currentState.addAssertedElementRegion(generateRegionAssertion(aep, "AEP for Original")); 
+						currentState.addCheckedElementRegion(generateRegionAssertion(cer, "AEP for Original")); 
 
 					break;
 				default:
@@ -628,7 +628,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		if (saveNewTrainingDatasetToFile==false)
 			return;
 
-		// Dumping the feature vectore of asserted element into training dataset
+		// Dumping the feature vectore of checked element into training dataset
 		// sample data format: <label> <featureIndex>:<featureValue>. E.g: +1 1:0.708333 2:1 3:1 4:-0.320755 5:-0.105023 ...
 		String label = elemFeatureVector.getClassLabel()>0 ? "+1" : "-1";
 		String sample = label + 
@@ -654,9 +654,9 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 	}
 
 
-	private ElementFeatures getAssertedElemFeatureVector(WebElement assertedElement) {
+	private ElementFeatures getCheckedElemFeatureVector(WebElement checkedElement) {
 
-		String xpath = getXPath(assertedElement);
+		String xpath = getXPath(checkedElement);
 
 
 		String[] blockTags = {"/div>", "/span>", "/p>", "/table>"};
@@ -693,15 +693,15 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		}
 
 		// extract info from the blocks
-		int classLabel = 1;	// since it is an asserted element
+		int classLabel = 1;	// since it is an checked element
 		int freshness = 1, textImportance = 0; // 1: true, 0: false
-		String blockInnerHTML = assertedElement.getAttribute("innerHTML");
+		String blockInnerHTML = checkedElement.getAttribute("innerHTML");
 		double innerHtmlDensity = (double) blockInnerHTML.length() / (double) bodyInnerHTML.length();
 
-		double blockXPos = (double) assertedElement.getLocation().getX();
-		double blockYPos = (double) assertedElement.getLocation().getY();
-		double blockWidth = (double) assertedElement.getSize().getWidth();
-		double blockHeight = (double) assertedElement.getSize().getHeight();
+		double blockXPos = (double) checkedElement.getLocation().getX();
+		double blockYPos = (double) checkedElement.getLocation().getY();
+		double blockWidth = (double) checkedElement.getSize().getWidth();
+		double blockHeight = (double) checkedElement.getSize().getHeight();
 
 		double normalBlockWidth = blockWidth / bodyWidth;
 		double normalBlockHeight = blockHeight / bodyHeight;
@@ -761,7 +761,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		ElementFeatures elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
 				normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, normalNumOfChildren, classLabel);
 
-		System.out.println("features for element " + assertedElement + " is: " + elementFeatures);
+		System.out.println("features for element " + checkedElement + " is: " + elementFeatures);
 		return elementFeatures;
 	}
 
@@ -870,7 +870,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 				double normalNumOfChildren = 0;
 				try {
 					SourceElement = getElementFromXpath(xpath, browser);
-					AssertedElementRegion aep = new AssertedElementRegion(SourceElement, "", xpath);
+					CheckedElementRegion cer = new CheckedElementRegion(SourceElement, "", xpath);
 					int numOfChildren = 0;
 					if (SourceElement!=null)
 						if (SourceElement.getChildNodes()!=null)
@@ -882,7 +882,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 					elementFeatures = new ElementFeatures(xpath, freshness, textImportance, normalBlockWidth, normalBlockHeight, 
 							normalBlockCenterX, normalBlockCenterY, innerHtmlDensity, linkDensity, blockDensity, normalNumOfChildren, classLabel);
 
-					elementFeatures.addElementRegionAssertion(generateRegionAssertion(aep, "SimilarAssertion").getAssertion());
+					elementFeatures.addElementRegionAssertion(generateRegionAssertion(cer, "SimilarAssertion").getAssertion());
 				} catch (XPathExpressionException e) {
 					System.out.println("XPathExpressionException!");
 					e.printStackTrace();
@@ -1189,7 +1189,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 	@Override
 	public void postCrawling(CrawlSession session, ExitStatus exitStatus) {
-		System.out.println("List of asserted element paterns in assertedElementRegions:");
+		System.out.println("List of checked element paterns in checkedElementRegions:");
 
 		StateFlowGraph sfg;
 		if (loadInitialSFGFromFile)
@@ -1203,12 +1203,12 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		}
 
 		for (StateVertex s: sfg.getAllStates()){
-			for (AssertedElementRegion	aep: s.getAssertedElementRegions())
+			for (CheckedElementRegion	aep: s.getCheckedElementRegions())
 				if (aep.getAssertionOrigin().equals("original assertion"))
-					originalAssertedElementRegions.add(aep);
+					originalCheckedElementRegions.add(aep);
 		}		
 
-		for (AssertedElementRegion	aep: originalAssertedElementRegions)
+		for (CheckedElementRegion	aep: originalCheckedElementRegions)
 			System.out.println(aep.getAssertion());
 
 		System.out.println("***************");
@@ -1246,12 +1246,12 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 			//System.out.println("Abstract state " + s.getName() + " has " + s.getRegionFullAssertions().size() + " RegionFullAssertions for non-abstract DOM elements.");
 
 			//System.out.println("DOM on state " + s.getName() + " is: " + s.getDom().replace("\n", "").replace("\r", "").replace(" ", ""));
-			//System.out.println("There are " + s.getAssertions().size() + " asserted element regions in state " + s.getName() + " before generation.");
+			//System.out.println("There are " + s.getAssertions().size() + " checked element regions in state " + s.getName() + " before generation.");
 			//if (s.getAssertions().size()>0)
 			//	for (int i=0;i<s.getAssertions().size();i++)
 			//		System.out.println(s.getAssertions().get(i));
 
-			for (AssertedElementRegion	aep: originalAssertedElementRegions){
+			for (CheckedElementRegion	aep: originalCheckedElementRegions){
 				//System.out.println("aep: " +  aep);
 				if (!s.getAssertions().contains(aep.getAssertion())){
 					try {
@@ -1262,13 +1262,13 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 						for (int i = 0; i < nodeList.getLength(); i++){
 							element = (org.w3c.dom.Element) nodeList.item(i);
 
-							AssertedElementRegion aepTemp = new AssertedElementRegion(element, "", aep.getAssertedElementLocator()); // creating an AssertedElementRegion without any assertion text
+							CheckedElementRegion aepTemp = new CheckedElementRegion(element, "", aep.getCheckedElementLocator()); // creating a checkedElementRegion without any assertion text
 							String howElementMatched = aep.getHowElementMatch(aepTemp);
 							String howRegionMatched = aep.getHowRegionMatch(aepTemp);
 
 							//aep.getAssertionType();
 
-							// AssertedElement-Level Assertion
+							// checkedElement-Level Assertion
 							switch (howElementMatched){
 							case "ElementFullMatch":
 								//System.out.println(aep);
@@ -1276,31 +1276,31 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 								//System.out.println(aepTemp);
 								aepTemp.setAssertion(aep.getAssertion());
 								aepTemp.setAssertionOrigin("reused assertion in case of ElementFullMatch");
-								s.addAssertedElementRegion(aepTemp); // reuse the same AssertedElementRegion
+								s.addCheckedElementRegion(aepTemp); // reuse the same checkedElementRegion
 								break;
 							case "ElementTagAttMatch":
 								//System.out.println(aep);
 								//System.out.println("ElementTagAttMatch");
-								s.addAssertedElementRegion(generateElementAssertion(aep, howElementMatched));
+								s.addCheckedElementRegion(generateElementAssertion(aep, howElementMatched));
 								break;
 							}
 
-							// AssertedElementRegion-Level Assertion
+							// checkedElementRegion-Level Assertion
 							switch (howRegionMatched){
 							case "RegionFullMatch":
 								//System.out.println(aep);
 								//System.out.println("RegionFullMatch");
-								s.addAssertedElementRegion(generateRegionAssertion(aep, howRegionMatched));
+								s.addCheckedElementRegion(generateRegionAssertion(aep, howRegionMatched));
 								break;
 							case "RegionTagAttMatch":
 								//System.out.println(aep);
 								//System.out.println("RegionTagAttMatch");
-								s.addAssertedElementRegion(generateRegionAssertion(aep, howRegionMatched)); 
+								s.addCheckedElementRegion(generateRegionAssertion(aep, howRegionMatched)); 
 								break;
 							case "RegionTagMatch":
 								//System.out.println(aep);
 								//System.out.println("RegionTagMatch");
-								s.addAssertedElementRegion(generateRegionAssertion(aep, howRegionMatched)); 
+								s.addCheckedElementRegion(generateRegionAssertion(aep, howRegionMatched)); 
 								break;
 							}
 
@@ -1312,7 +1312,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 				}
 
 			}
-			//System.out.println("There are " + s.getAssertions().size() + " asserted element regions in state " + s.getName() + " after generation.");
+			//System.out.println("There are " + s.getAssertions().size() + " checked element regions in state " + s.getName() + " after generation.");
 			//if (s.getAssertions().size()>0)
 			//	for (int i=0;i<s.getAssertions().size();i++)
 			//		System.out.println(s.getAssertions().get(i));
@@ -1407,13 +1407,13 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 
 
-	private AssertedElementRegion generateRegionAssertion(AssertedElementRegion aep, String howMatched) {
+	private CheckedElementRegion generateRegionAssertion(CheckedElementRegion aep, String howMatched) {
 		// region assertion on BODY is useless
 		if (aep.getTagName().toUpperCase().equals("BODY"))
 			return null;
 
 		String elementTag = aep.getTagName();
-		if (elementTag.equals("")) // do not create AEP-level assertion for undefined asserted elements (such as those on title, alerts, url, etc.)
+		if (elementTag.equals("")) // do not create AEP-level assertion for undefined checked elements (such as those on title, alerts, url, etc.)
 			return null;
 
 		String elementText = "";//aep.getTextContent();
@@ -1476,7 +1476,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		else
 			regionCheckAssertion += "\t\tassertTrue(isElementRegionFullPresent(parentElement , element, childrenElements))";
 
-		AssertedElementRegion aepMatch = new AssertedElementRegion(aep.getSourceElement(), regionCheckAssertion, aep.getAssertedElementLocator());
+		CheckedElementRegion aepMatch = new CheckedElementRegion(aep.getSourceElement(), regionCheckAssertion, aep.getCheckedElementLocator());
 		aepMatch.setAssertionOrigin("generated assertion in case of " + howMatched);
 
 		//System.out.println(aepMatch);
@@ -1484,15 +1484,15 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 	}
 
 
-	private AssertedElementRegion generateElementAssertion(AssertedElementRegion aep, String howMatched) {
-		// generating an AssertedElementRegion based on the matching result
-		AssertedElementRegion newaep = new AssertedElementRegion(aep.getSourceElement(), "", aep.getAssertedElementLocator()); // creating an AssertedElementRegion without any assertion text
+	private CheckedElementRegion generateElementAssertion(CheckedElementRegion aep, String howMatched) {
+		// generating a checkedElementRegion based on the matching result
+		CheckedElementRegion newaep = new CheckedElementRegion(aep.getSourceElement(), "", aep.getCheckedElementLocator()); // creating a checkedElementRegion without any assertion text
 
 		if (newaep.getTagName().toUpperCase().equals("BODY"))
 			return null;
 
 		ArrayList<String> atts = new ArrayList<String>(aep.getAttributes());
-		String locator = newaep.getAssertedElementLocator();
+		String locator = newaep.getCheckedElementLocator();
 		//locator.replace("\")", "\")");
 		String newLocator ="";
 
@@ -1669,9 +1669,9 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 					// Adding original assertion to the method
 					if (addOriginalAssertions){
 						if (edge.getSourceStateVertex().getAssertions().size()>0){
-							for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
-								String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
-								String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+							for (int i=0;i<edge.getSourceStateVertex().getCheckedElementRegions().size();i++){
+								String assertion = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertion();
+								String assertionOringin = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 								if (assertionOringin.contains("original assertion")){
 									checkMethod1.addStatement(assertion + "; // " + assertionOringin+"\n");
 									if (addAllAssertions){
@@ -1687,9 +1687,9 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 					// Adding reused/generated assertions
 					if (edge.getSourceStateVertex().getAssertions().size()>0)
-						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
-							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
-							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+						for (int i=0;i<edge.getSourceStateVertex().getCheckedElementRegions().size();i++){
+							String assertion = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertion();
+							String assertionOringin = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 
 							// problem with Claroline app
 							if (edge.getSourceStateVertex().getId()==0 && assertion.equals("assertTrue(isElementPresent(By.linkText(\"Logout\")))"))
@@ -1711,11 +1711,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 					// prioritizing assertions: add RegionFullMatch as much as possible 
 					if (edge.getSourceStateVertex().getAssertions().size()>0)
-						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
-							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
+						for (int i=0;i<edge.getSourceStateVertex().getCheckedElementRegions().size();i++){
+							String assertion = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertion();
 							if (assertion.length()>4000)
 								continue;
-							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+							String assertionOringin = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 							// Adding generated assertion to the method
 							if (addGeneratedAssertions){
 								if (assertionOringin.contains("generated assertion")){
@@ -1739,11 +1739,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 						}
 					// RegionTagAttMatch
 					if (edge.getSourceStateVertex().getAssertions().size()>0)
-						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
-							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
+						for (int i=0;i<edge.getSourceStateVertex().getCheckedElementRegions().size();i++){
+							String assertion = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertion();
 							if (assertion.length()>4000)
 								continue;
-							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+							String assertionOringin = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 							// Adding generated assertion to the method
 							if (addGeneratedAssertions){
 								if (assertionOringin.contains("generated assertion")){
@@ -1796,11 +1796,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 					// ElementTagAttMatch
 					if (edge.getSourceStateVertex().getAssertions().size()>0)
-						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
-							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
+						for (int i=0;i<edge.getSourceStateVertex().getCheckedElementRegions().size();i++){
+							String assertion = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertion();
 							if (assertion.length()>4000)
 								continue;
-							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+							String assertionOringin = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 							// Adding generated assertion to the method
 							if (addGeneratedAssertions){
 								if (assertionOringin.contains("generated assertion")){
@@ -1823,11 +1823,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 					// RegionTagMatch
 					if (edge.getSourceStateVertex().getAssertions().size()>0)
-						for (int i=0;i<edge.getSourceStateVertex().getAssertedElementRegions().size();i++){
-							String assertion = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertion();
+						for (int i=0;i<edge.getSourceStateVertex().getCheckedElementRegions().size();i++){
+							String assertion = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertion();
 							if (assertion.length()>4000)
 								continue;
-							String assertionOringin = edge.getSourceStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+							String assertionOringin = edge.getSourceStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 							// Adding generated assertion to the method
 							if (addGeneratedAssertions){
 								if (assertionOringin.contains("generated assertion")){
@@ -2005,9 +2005,9 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 						// Adding original assertion to the method
 						if (addOriginalAssertions){
 							if (edge.getTargetStateVertex().getAssertions().size()>0){
-								for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
-									String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
-									String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+								for (int i=0;i<edge.getTargetStateVertex().getCheckedElementRegions().size();i++){
+									String assertion = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertion();
+									String assertionOringin = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 									if (assertionOringin.contains("original assertion")){
 										checkMethod1.addStatement(assertion + "; // " + assertionOringin+"\n");
 										if (addAllAssertions){
@@ -2023,9 +2023,9 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 						// Adding reused/generated assertions
 						if (edge.getTargetStateVertex().getAssertions().size()>0)
-							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
-								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
-								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+							for (int i=0;i<edge.getTargetStateVertex().getCheckedElementRegions().size();i++){
+								String assertion = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertion();
+								String assertionOringin = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 
 								// problem with Claroline app
 								if (edge.getTargetStateVertex().getId()==0 && assertion.equals("assertTrue(isElementPresent(By.linkText(\"Logout\")))"))
@@ -2048,11 +2048,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 						// prioritizing assertions: add RegionFullMatch as much as possible 
 						if (edge.getTargetStateVertex().getAssertions().size()>0)
-							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
-								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
+							for (int i=0;i<edge.getTargetStateVertex().getCheckedElementRegions().size();i++){
+								String assertion = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertion();
 								if (assertion.length()>4000)
 									continue;
-								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+								String assertionOringin = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 								// Adding generated assertion to the method
 								if (addGeneratedAssertions){
 									if (assertionOringin.contains("generated assertion")){
@@ -2076,11 +2076,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 							}
 						// RegionTagAttMatch
 						if (edge.getTargetStateVertex().getAssertions().size()>0)
-							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
-								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
+							for (int i=0;i<edge.getTargetStateVertex().getCheckedElementRegions().size();i++){
+								String assertion = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertion();
 								if (assertion.length()>4000)
 									continue;
-								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+								String assertionOringin = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 								// Adding generated assertion to the method
 								if (addGeneratedAssertions){
 									if (assertionOringin.contains("generated assertion")){
@@ -2133,11 +2133,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 						// ElementTagAttMatch
 						if (edge.getTargetStateVertex().getAssertions().size()>0)
-							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
-								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
+							for (int i=0;i<edge.getTargetStateVertex().getCheckedElementRegions().size();i++){
+								String assertion = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertion();
 								if (assertion.length()>4000)
 									continue;
-								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+								String assertionOringin = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 								// Adding generated assertion to the method
 								if (addGeneratedAssertions){
 									if (assertionOringin.contains("generated assertion")){
@@ -2160,11 +2160,11 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 						// RegionTagMatch
 						if (edge.getTargetStateVertex().getAssertions().size()>0)
-							for (int i=0;i<edge.getTargetStateVertex().getAssertedElementRegions().size();i++){
-								String assertion = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertion();
+							for (int i=0;i<edge.getTargetStateVertex().getCheckedElementRegions().size();i++){
+								String assertion = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertion();
 								if (assertion.length()>4000)
 									continue;
-								String assertionOringin = edge.getTargetStateVertex().getAssertedElementRegions().get(i).getAssertionOrigin(); 
+								String assertionOringin = edge.getTargetStateVertex().getCheckedElementRegions().get(i).getAssertionOrigin(); 
 								// Adding generated assertion to the method
 								if (addGeneratedAssertions){
 									if (assertionOringin.contains("generated assertion")){
@@ -2243,7 +2243,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 		System.out.println("Total #sink nodes:" + results.size());
 
-		System.out.println("Total #assertions in the original test suite:" + originalAssertedElementRegions.size());
+		System.out.println("Total #assertions in the original test suite:" + originalCheckedElementRegions.size());
 
 		System.out.println("Total #assertions in the test suite from happy paths (origAndReusedAssertions): " + origAndReusedAssertions);
 
@@ -2251,7 +2251,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 		//System.out.println("Total #reused (cloned in other states) assertions in the extended test suite: " + reusedAssertions);
 
-		int reusedOrigAssertions = origAndReusedAssertions-originalAssertedElementRegions.size(); // original assertions that are reused in extended paths		
+		int reusedOrigAssertions = origAndReusedAssertions-originalCheckedElementRegions.size(); // original assertions that are reused in extended paths		
 		reusedAssertions += reusedOrigAssertions;
 
 		System.out.println("Total #reused assertions (cloned + added) in the extended test suite: " + reusedAssertions);
@@ -2386,12 +2386,12 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 				}
 
-				AssertedElementRegion aep = new AssertedElementRegion(element, "", "By.xpath(\"" + xpath + "\")"); // creating an AssertedElementRegion without any assertion text
+				CheckedElementRegion cer = new CheckedElementRegion(element, "", "By.xpath(\"" + xpath + "\")"); // creating a checkedElementRegion without any assertion text
 				// generate element/region assertions in the form of strings for each DOM element
-				String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
-				String regionTagAssertion =  generateRegionAssertion(aep, "RegionTagMatch").getAssertion();
-				String regionTagAttAssertion =  generateRegionAssertion(aep, "RegionTagAttMatch").getAssertion();
-				String regionFullAssertion =  generateRegionAssertion(aep, "RegionFullMatch").getAssertion();
+				String elementTagAttAssertion =  generateElementAssertion(cer, "ElementTagAttMatch").getAssertion();
+				String regionTagAssertion =  generateRegionAssertion(cer, "RegionTagMatch").getAssertion();
+				String regionTagAttAssertion =  generateRegionAssertion(cer, "RegionTagAttMatch").getAssertion();
+				String regionFullAssertion =  generateRegionAssertion(cer, "RegionFullMatch").getAssertion();
 
 				if (elementTagAttAssertion.length()<4000)
 					tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
@@ -2531,12 +2531,12 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 					}
 
 
-					AssertedElementRegion aep = new AssertedElementRegion(element, "", "By.xpath(\"" + xpath + "\")"); // creating an AssertedElementRegion without any assertion text
+					CheckedElementRegion cer = new CheckedElementRegion(element, "", "By.xpath(\"" + xpath + "\")"); // creating a CheckedElementRegion without any assertion text
 					// generate element/region assertions in the form of strings for each DOM element
-					String elementTagAttAssertion =  generateElementAssertion(aep, "ElementTagAttMatch").getAssertion();
-					String regionTagAssertion =  generateRegionAssertion(aep, "RegionTagMatch").getAssertion();
-					String regionTagAttAssertion =  generateRegionAssertion(aep, "RegionTagAttMatch").getAssertion();
-					String regionFullAssertion =  generateRegionAssertion(aep, "RegionFullMatch").getAssertion();
+					String elementTagAttAssertion =  generateElementAssertion(cer, "ElementTagAttMatch").getAssertion();
+					String regionTagAssertion =  generateRegionAssertion(cer, "RegionTagMatch").getAssertion();
+					String regionTagAttAssertion =  generateRegionAssertion(cer, "RegionTagAttMatch").getAssertion();
+					String regionFullAssertion =  generateRegionAssertion(cer, "RegionFullMatch").getAssertion();
 
 					if (elementTagAttAssertion.length()<4000)
 						tempListOfelementTagAttAssertions.add(elementTagAttAssertion);
