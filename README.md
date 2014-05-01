@@ -4,11 +4,11 @@ Testilizer plugin
 Testilizer is a tool which utilizes an existing Selenium test suite of a web application to generate new test cases with assertions. 
 
 
-Usage
+Instructions
 -----------------
 
 Testilizer is built on top of Crawljax as a plugin. For the deployment, this local modified version of [Crawljax](https://github.com/aminmf/crawljax) should also be installed.
 
+Add the external libsvm library from Testilizer/lib to the testilizer project.
+
 Run it trough the Main class in crawljax/examples/src/main/java/com/crawljax/examples/TestilizerExample.java
-
-
