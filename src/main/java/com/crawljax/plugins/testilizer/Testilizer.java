@@ -1,9 +1,5 @@
 package com.crawljax.plugins.testilizer;
 
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -47,8 +43,6 @@ import javax.xml.xpath.XPathExpressionException;
 import libsvm.svm;
 import libsvm.svm_model;
 import libsvm.svm_node;
-import libsvm.svm_parameter;
-
 
 import org.jgrapht.GraphPath;
 import org.junit.runner.JUnitCore;
@@ -76,8 +70,6 @@ import com.crawljax.core.plugin.ExecuteInitialPathsPlugin;
 import com.crawljax.core.plugin.OnCloneStateDetectedPlugin;
 import com.crawljax.core.plugin.OnFireEventSucceededPlugin;
 import com.crawljax.core.plugin.OnNewStatePlugin;
-import com.crawljax.core.plugin.OnRevisitStatePlugin;
-import com.crawljax.core.plugin.OnUrlLoadPlugin;
 import com.crawljax.core.plugin.PostCrawlingPlugin;
 import com.crawljax.core.plugin.PreCrawlingPlugin;
 import com.crawljax.core.plugin.PreStateCrawlingPlugin;
@@ -90,7 +82,6 @@ import com.crawljax.core.state.Identification.How;
 import com.crawljax.forms.FormInput;
 import com.crawljax.forms.RandomInputValueGenerator;
 import com.crawljax.plugins.testilizer.seleniuminstrumentor.SeleniumInstrumentor;
-import com.crawljax.plugins.testilizer.svm.svm_predict;
 import com.crawljax.plugins.testilizer.svm.svm_train;
 import com.crawljax.plugins.testilizer.testcasegenerator.JavaTestGenerator;
 import com.crawljax.plugins.testilizer.testcasegenerator.TestMethod;
@@ -598,7 +589,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 					boolean assertionAdded = currentState.addCheckedElementRegion(cer);
 					// adding a checkedElemetRegion-level assertion for the original assertion
 					if (assertionAdded)
-						currentState.addCheckedElementRegion(generateRegionAssertion(cer, "AEP for Original")); 
+						currentState.addCheckedElementRegion(generateRegionAssertion(cer, "CER for Original")); 
 
 					break;
 				default:
@@ -1203,13 +1194,13 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		}
 
 		for (StateVertex s: sfg.getAllStates()){
-			for (CheckedElementRegion	aep: s.getCheckedElementRegions())
-				if (aep.getAssertionOrigin().equals("original assertion"))
-					originalCheckedElementRegions.add(aep);
+			for (CheckedElementRegion cer: s.getCheckedElementRegions())
+				if (cer.getAssertionOrigin().equals("original assertion"))
+					originalCheckedElementRegions.add(cer);
 		}		
 
-		for (CheckedElementRegion	aep: originalCheckedElementRegions)
-			System.out.println(aep.getAssertion());
+		for (CheckedElementRegion cer: originalCheckedElementRegions)
+			System.out.println(cer.getAssertion());
 
 		System.out.println("***************");
 
@@ -1251,56 +1242,56 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 			//	for (int i=0;i<s.getAssertions().size();i++)
 			//		System.out.println(s.getAssertions().get(i));
 
-			for (CheckedElementRegion	aep: originalCheckedElementRegions){
-				//System.out.println("aep: " +  aep);
-				if (!s.getAssertions().contains(aep.getAssertion())){
+			for (CheckedElementRegion cer: originalCheckedElementRegions){
+				//System.out.println("cer: " +  cer);
+				if (!s.getAssertions().contains(cer.getAssertion())){
 					try {
 						Document dom = DomUtils.asDocument(s.getDom());
-						NodeList nodeList = dom.getElementsByTagName(aep.getTagName());
+						NodeList nodeList = dom.getElementsByTagName(cer.getTagName());
 
 						org.w3c.dom.Element element = null;
 						for (int i = 0; i < nodeList.getLength(); i++){
 							element = (org.w3c.dom.Element) nodeList.item(i);
 
-							CheckedElementRegion aepTemp = new CheckedElementRegion(element, "", aep.getCheckedElementLocator()); // creating a checkedElementRegion without any assertion text
-							String howElementMatched = aep.getHowElementMatch(aepTemp);
-							String howRegionMatched = aep.getHowRegionMatch(aepTemp);
+							CheckedElementRegion cerTemp = new CheckedElementRegion(element, "", cer.getCheckedElementLocator()); // creating a checkedElementRegion without any assertion text
+							String howElementMatched = cer.getHowElementMatch(cerTemp);
+							String howRegionMatched = cer.getHowRegionMatch(cerTemp);
 
-							//aep.getAssertionType();
+							//cer.getAssertionType();
 
 							// checkedElement-Level Assertion
 							switch (howElementMatched){
 							case "ElementFullMatch":
-								//System.out.println(aep);
+								//System.out.println(cer);
 								//System.out.println("ElementFullMatch");
-								//System.out.println(aepTemp);
-								aepTemp.setAssertion(aep.getAssertion());
-								aepTemp.setAssertionOrigin("reused assertion in case of ElementFullMatch");
-								s.addCheckedElementRegion(aepTemp); // reuse the same checkedElementRegion
+								//System.out.println(cerTemp);
+								cerTemp.setAssertion(cer.getAssertion());
+								cerTemp.setAssertionOrigin("reused assertion in case of ElementFullMatch");
+								s.addCheckedElementRegion(cerTemp); // reuse the same checkedElementRegion
 								break;
 							case "ElementTagAttMatch":
-								//System.out.println(aep);
+								//System.out.println(cer);
 								//System.out.println("ElementTagAttMatch");
-								s.addCheckedElementRegion(generateElementAssertion(aep, howElementMatched));
+								s.addCheckedElementRegion(generateElementAssertion(cer, howElementMatched));
 								break;
 							}
 
 							// checkedElementRegion-Level Assertion
 							switch (howRegionMatched){
 							case "RegionFullMatch":
-								//System.out.println(aep);
+								//System.out.println(cer);
 								//System.out.println("RegionFullMatch");
-								s.addCheckedElementRegion(generateRegionAssertion(aep, howRegionMatched));
+								s.addCheckedElementRegion(generateRegionAssertion(cer, howRegionMatched));
 								break;
 							case "RegionTagAttMatch":
-								//System.out.println(aep);
+								//System.out.println(cer);
 								//System.out.println("RegionTagAttMatch");
-								s.addCheckedElementRegion(generateRegionAssertion(aep, howRegionMatched)); 
+								s.addCheckedElementRegion(generateRegionAssertion(cer, howRegionMatched)); 
 								break;
 							case "RegionTagMatch":
-								//System.out.println(aep);
+								//System.out.println(cer);
 								//System.out.println("RegionTagMatch");
-								s.addCheckedElementRegion(generateRegionAssertion(aep, howRegionMatched)); 
+								s.addCheckedElementRegion(generateRegionAssertion(cer, howRegionMatched)); 
 								break;
 							}
 
@@ -1407,38 +1398,38 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 
 
-	private CheckedElementRegion generateRegionAssertion(CheckedElementRegion aep, String howMatched) {
+	private CheckedElementRegion generateRegionAssertion(CheckedElementRegion cer, String howMatched) {
 		// region assertion on BODY is useless
-		if (aep.getTagName().toUpperCase().equals("BODY"))
+		if (cer.getTagName().toUpperCase().equals("BODY"))
 			return null;
 
-		String elementTag = aep.getTagName();
-		if (elementTag.equals("")) // do not create AEP-level assertion for undefined checked elements (such as those on title, alerts, url, etc.)
+		String elementTag = cer.getTagName();
+		if (elementTag.equals("")) // do not create CER-level assertion for undefined checked elements (such as those on title, alerts, url, etc.)
 			return null;
 
-		String elementText = "";//aep.getTextContent();
-		if (aep.getTextContent().length() < 50)
-			elementText = aep.getTextContent();
-		ArrayList<String> elementAttributes = new ArrayList<String>(aep.getAttributes());
+		String elementText = "";//cer.getTextContent();
+		if (cer.getTextContent().length() < 50)
+			elementText = cer.getTextContent();
+		ArrayList<String> elementAttributes = new ArrayList<String>(cer.getAttributes());
 
-		String parentTag =  aep.getParentTagName();
-		String parentText =  "";//aep.getParentTextContent();
-		if (aep.getParentTextContent().length() < 50)
-			elementText = aep.getParentTextContent();
-		ArrayList<String> parentAttributes = new ArrayList<String>(aep.getParentAttributes());
+		String parentTag =  cer.getParentTagName();
+		String parentText =  "";//cer.getParentTextContent();
+		if (cer.getParentTextContent().length() < 50)
+			elementText = cer.getParentTextContent();
+		ArrayList<String> parentAttributes = new ArrayList<String>(cer.getParentAttributes());
 
-		ArrayList<String> childrenTags = new ArrayList<String>(aep.getChildrenTagName());
+		ArrayList<String> childrenTags = new ArrayList<String>(cer.getChildrenTagName());
 		ArrayList<String> childrenTexts = new ArrayList<String>();
 
-		for (String text: aep.getChildrenTextContent())
+		for (String text: cer.getChildrenTextContent())
 			if (text.length() < 50)
 				childrenTexts.add(text);
 			else
 				childrenTexts.add("");
 
 		ArrayList<ArrayList<String>> childrenAttributes = new ArrayList<ArrayList<String>>();
-		for (int i=0; i < aep.getChildrenAttributes().size(); i++)
-			childrenAttributes.add(aep.getChildrenAttributes().get(i));
+		for (int i=0; i < cer.getChildrenAttributes().size(); i++)
+			childrenAttributes.add(cer.getChildrenAttributes().get(i));
 
 		// DOMElement element = new DOMElement(String tagName, String textContent, ArrayList<String> attributes);
 		String regionCheckAssertion = "element = new DOMElement(\"" + elementTag + "\", \"" + elementText.replace("\"", "\\\"") + "\", new ArrayList<String>(Arrays.asList(\"";
@@ -1476,23 +1467,23 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		else
 			regionCheckAssertion += "\t\tassertTrue(isElementRegionFullPresent(parentElement , element, childrenElements))";
 
-		CheckedElementRegion aepMatch = new CheckedElementRegion(aep.getSourceElement(), regionCheckAssertion, aep.getCheckedElementLocator());
-		aepMatch.setAssertionOrigin("generated assertion in case of " + howMatched);
+		CheckedElementRegion cerMatch = new CheckedElementRegion(cer.getSourceElement(), regionCheckAssertion, cer.getCheckedElementLocator());
+		cerMatch.setAssertionOrigin("generated assertion in case of " + howMatched);
 
-		//System.out.println(aepMatch);
-		return aepMatch;
+		//System.out.println(cerMatch);
+		return cerMatch;
 	}
 
 
-	private CheckedElementRegion generateElementAssertion(CheckedElementRegion aep, String howMatched) {
+	private CheckedElementRegion generateElementAssertion(CheckedElementRegion cer, String howMatched) {
 		// generating a checkedElementRegion based on the matching result
-		CheckedElementRegion newaep = new CheckedElementRegion(aep.getSourceElement(), "", aep.getCheckedElementLocator()); // creating a checkedElementRegion without any assertion text
+		CheckedElementRegion cerNew = new CheckedElementRegion(cer.getSourceElement(), "", cer.getCheckedElementLocator()); // creating a checkedElementRegion without any assertion text
 
-		if (newaep.getTagName().toUpperCase().equals("BODY"))
+		if (cerNew.getTagName().toUpperCase().equals("BODY"))
 			return null;
 
-		ArrayList<String> atts = new ArrayList<String>(aep.getAttributes());
-		String locator = newaep.getCheckedElementLocator();
+		ArrayList<String> atts = new ArrayList<String>(cer.getAttributes());
+		String locator = cerNew.getCheckedElementLocator();
 		//locator.replace("\")", "\")");
 		String newLocator ="";
 
@@ -1537,16 +1528,16 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 
 		switch (howMatched){
 		case "ElementTagAttMatch":
-			newaep.setAssertion("assertTrue(isElementPresent("+ newLocator +"))");
-			//System.out.println(newaep);
+			cerNew.setAssertion("assertTrue(isElementPresent("+ newLocator +"))");
+			//System.out.println(cerNew);
 			break;
 		case "ElementTagMatch":
-			newaep.setAssertion("assertTrue(isElementPresent(By.tagName(\"" + newaep.getTagName() +"\")))");
-			//System.out.println(newaep);
+			cerNew.setAssertion("assertTrue(isElementPresent(By.tagName(\"" + cerNew.getTagName() +"\")))");
+			//System.out.println(cerNew);
 			break;
 		}
-		newaep.setAssertionOrigin("generated assertion in case of " + howMatched);
-		return newaep;
+		cerNew.setAssertionOrigin("generated assertion in case of " + howMatched);
+		return cerNew;
 	}
 
 
@@ -1566,7 +1557,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		String how, howValue, sendValue;
 
 		int counter = 0, totalAssertions = 0, predictedAssertions = 0, origAndReusedAssertions = 0, reusedAssertions = 0, generatedAssertions = 0, 
-				ElementFullMatch = 0, ElementTagAttMatch = 0, RegionFullMatch = 0, RegionTagAttMatch = 0, RegionTagMatch = 0, AEPforOriginalAssertions=0;
+				ElementFullMatch = 0, ElementTagAttMatch = 0, RegionFullMatch = 0, RegionTagAttMatch = 0, RegionTagMatch = 0, CERforOriginalAssertions=0;
 
 		int randElementTagAttAssertionsOnStates = 0, randRegionTagAssertionsOnStates =0, randRegionTagAttAssertionsOnStates =0, randRegionFullAssertionsOnStates = 0;
 
@@ -1720,7 +1711,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 							if (addGeneratedAssertions){
 								if (assertionOringin.contains("generated assertion")){
 									//testMethod.addStatement("\n");
-									if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("AEP for Original")){
+									if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("CER for Original")){
 										if (checkMethod3.getStatements().size() < 5)
 											checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
 										if (checkMethod5.getStatements().size() < 5)
@@ -1731,8 +1722,8 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 										generatedAssertions++;
 										if (assertionOringin.contains("RegionFullMatch"))
 											RegionFullMatch++;
-										if (assertionOringin.contains("AEP for Original"))
-											AEPforOriginalAssertions++;	
+										if (assertionOringin.contains("CER for Original"))
+											CERforOriginalAssertions++;	
 									}
 								}
 							}
@@ -2057,7 +2048,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 								if (addGeneratedAssertions){
 									if (assertionOringin.contains("generated assertion")){
 										//testMethod.addStatement("\n");
-										if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("AEP for Original")){
+										if (assertionOringin.contains("RegionFullMatch") || assertionOringin.contains("CER for Original")){
 											if (checkMethod3.getStatements().size() < 5)
 												checkMethod3.addStatement(assertion + "; // " + assertionOringin+"\n");
 											if (checkMethod5.getStatements().size() < 5)
@@ -2068,8 +2059,8 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 											generatedAssertions++;
 											if (assertionOringin.contains("RegionFullMatch"))
 												RegionFullMatch++;
-											if (assertionOringin.contains("AEP for Original"))
-												AEPforOriginalAssertions++;	
+											if (assertionOringin.contains("CER for Original"))
+												CERforOriginalAssertions++;	
 										}
 									}
 								}
@@ -2265,7 +2256,7 @@ PostCrawlingPlugin, OnFireEventSucceededPlugin, ExecuteInitialPathsPlugin, DomCh
 		System.out.println("Total #RegionTagAttMatch: " + RegionTagAttMatch);
 		System.out.println("Total #RegionTagMatch: " + RegionTagMatch);
 		System.out.println("Total #predictedAssertions: " + predictedAssertions);
-		System.out.println("Total #AEPforOriginalAssertions: " + AEPforOriginalAssertions);
+		System.out.println("Total #CERforOriginalAssertions: " + CERforOriginalAssertions);
 
 		System.out.println("numberOfStatesInTestSuite: " + numberOfStatesInTestSuite);
 
