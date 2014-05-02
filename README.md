@@ -9,6 +9,4 @@ Instructions
 
 Testilizer is built on top of Crawljax as a plugin. For the deployment, this local modified version of [Crawljax](https://github.com/aminmf/crawljax) should also be installed. The origianl test suites are located in crawljax/examples/src/main/java/com/crawljax/plugins/testilizer/casestudies/
 
-Add the external libsvm library from Testilizer/lib to the testilizer project.
-
 Run it trough the Main class in crawljax/examples/src/main/java/com/crawljax/examples/TestilizerExample.java
